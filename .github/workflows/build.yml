@@ -23,12 +23,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -37,7 +37,17 @@ jobs:
       - run: npx cap sync android
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle-build.log
+      - name: Report the Gradle error
+        if: failure()
+        working-directory: android
+        shell: bash
+        run: |
+          # Turn the important lines into annotations, which show on the PR and through the public API.
+          grep -E -A12 "What went wrong|^e: |error:|Could not|FAILURE" gradle-build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
       - uses: actions/upload-artifact@v4
         with:
           name: chamber-android-debug-${{ github.sha }}
@@ -49,8 +59,8 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
