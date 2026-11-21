@@ -30,9 +30,10 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 
 ## 3. Testing a build on a phone
 
-1. Open the PR → **Checks** → the finished **Build** run → **Artifacts** → download `chamber-android-debug-…`
-   (signed in to GitHub).
-2. Unzip it and tap `app-debug.apk`. Allow installs from Files or the browser for this install only, then turn it
+1. **On a phone:** open the direct link from the build, `https://github.com/GhostPortTechnologies/Chamber-Mobile/releases/download/test-<branch>/chamber-test-<branch>.apk`
+   (also on the **Releases** page as "Test build: <branch>"). No zip and no sign-in needed.
+   On a computer you can use the run's **Artifacts** zip instead (needs a GitHub sign-in, and doesn't work well on phones).
+2. Tap the `.apk`. Allow installs from Files or the browser for this install only, then turn it
    off again (GrapheneOS: Settings → Apps → Special app access → Install unknown apps).
 3. Check, every time:
    - [ ] The icon is dark (#0A0D0B) with the Chamber mark, not white
@@ -67,4 +68,5 @@ different app. Uninstall the test build first.
 | 2026-11-21 | First Android build failed and the full log needs a GitHub sign-in | CI posts Gradle errors as public annotations (section 2) |
 | 2026-11-21 | `@capacitor/assets` made an adaptive icon pointing to `@mipmap/ic_launcher_background`, which it never generated, and defaulted to white | Icon background is the color resource `#0A0D0B`. After regenerating icons, check `mipmap-anydpi-v26/*.xml` |
 | 2026-11-21 | Long commands on the phone were killed (exit 137) when the session was interrupted or the Terminal app was in the background | Keep the Terminal on screen during long installs, and work in short steps that can be resumed |
+| 2026-11-21 | Tapping the Actions artifact on a phone did nothing (zip, sign-in only) | CI also publishes each branch's APK as a `test-<branch>` pre-release, a direct link |
 | 2026-11-21 | Repo renamed `chamber-mobile` → `Chamber-Mobile` | Remote is `github-chamber-mobile:GhostPortTechnologies/Chamber-Mobile.git` |
