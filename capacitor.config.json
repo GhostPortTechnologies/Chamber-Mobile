@@ -1,0 +1,20 @@
+{
+  "appId": "com.ghostporttechnologies.chamber",
+  "appName": "Chamber",
+  "webDir": "www",
+  "backgroundColor": "#0a0d0b",
+  "server": {
+    "url": "https://chamber.ghostporttechnologies.com/app",
+    "allowNavigation": ["chamber.ghostporttechnologies.com"],
+    "errorPath": "offline.html",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "limitsNavigationsToAppBoundDomains": true
+  }
+}

@@ -1,0 +1,100 @@
+name: Build
+
+# Every push and pull request builds an Android test app (debug APK, downloadable from the run's
+# "Artifacts") and checks that the iOS project compiles for the simulator. Nothing is signed or
+# published here: store builds come later, once the Apple and Google Play accounts exist (T-0323).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android (debug APK)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only to publish the test-build pre-release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle-build.log
+      - name: Report the Gradle error
+        if: failure()
+        working-directory: android
+        shell: bash
+        run: |
+          # Turn the important lines into annotations, which show on the PR and through the public API.
+          grep -E -A12 "What went wrong|^e: |error:|Could not|FAILURE" gradle-build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chamber-android-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+      # A direct link that works on a phone (no zip, no sign-in): one pre-release per branch, replaced on every build.
+      # Debug builds only; the repo is public anyway. Skipped for PRs from forks, which get a read-only token.
+      - name: Publish test build (direct phone download)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        shell: bash
+        run: |
+          TAG="test-$(echo "$BRANCH" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
+          APK="chamber-${TAG}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          NOTES="Test build of branch ${BRANCH} (commit ${GITHUB_SHA::7}). Debug build for testing only, not for the store. Install: tap ${APK} below. See docs/SOP.md section 3."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes "$NOTES" --prerelease
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --prerelease --target "$GITHUB_SHA" --title "Test build: ${BRANCH}" --notes "$NOTES"
+          fi
+          echo "::notice::Phone download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APK}"
+
+  ios:
+    name: iOS (simulator build, unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx cap sync ios
+      - name: Build for the iOS simulator
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
