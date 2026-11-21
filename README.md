@@ -51,6 +51,9 @@ npx cap sync
 
 ## Rules
 
+The full procedures (building, testing a build on a phone, secrets, lessons learned) are in
+[docs/SOP.md](docs/SOP.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
 - Work goes through pull requests. `main` is what has been reviewed and approved.
 - No signing keys, keystores or Firebase/Apple config files are ever committed (see `.gitignore`); they live in
   GitHub Actions secrets once the store accounts exist.
