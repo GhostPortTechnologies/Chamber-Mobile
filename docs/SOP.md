@@ -32,6 +32,8 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 2. Tap the `.apk`. Allow installs from Files or the browser for this install only, then turn it
    off again (Android: Settings → Apps → Special app access → Install unknown apps).
 3. Check, every time:
+   - [ ] Nothing is under the status bar or gesture bar: the header's ☰, search and ⚙ sit fully below the clock and
+         battery, and the message box stays above the keyboard
    - [ ] The icon is dark (#0A0D0B) with the Chamber mark, not white
    - [ ] You can sign in, and you're still signed in after the app is closed and reopened
    - [ ] Links to other sites open in the system browser, not inside the app

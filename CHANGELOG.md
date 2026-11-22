@@ -11,4 +11,7 @@
 - GitHub Actions: Android debug APK artifact on every PR, unsigned iOS simulator build; Gradle errors show as
   annotations.
 - First green build 2026-11-21: run 44963784892 (Android ✅, iOS ✅).
+- Android: the app keeps Chamber clear of the status bar, camera cutout, gesture bar and keyboard (native padding,
+  dark bars with light icons). The header's buttons were under the clock and battery icons. iOS and the web app get the
+  proper fix in Chamber itself (T-0338).
 - Docs: README (why native, against ROADMAP.md) and `docs/SOP.md`.

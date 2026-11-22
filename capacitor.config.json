@@ -5,7 +5,9 @@
   "backgroundColor": "#0a0d0b",
   "server": {
     "url": "https://chamber.ghostporttechnologies.com/app",
-    "allowNavigation": ["chamber.ghostporttechnologies.com"],
+    "allowNavigation": [
+      "chamber.ghostporttechnologies.com"
+    ],
     "errorPath": "offline.html",
     "cleartext": false
   },
@@ -16,5 +18,11 @@
   "ios": {
     "contentInset": "never",
     "limitsNavigationsToAppBoundDomains": true
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "disable",
+      "style": "DARK"
+    }
   }
 }
