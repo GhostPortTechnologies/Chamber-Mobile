@@ -13,5 +13,5 @@
 - First green build 2026-11-21: run 44963784892 (Android ✅, iOS ✅).
 - Android: the app keeps Chamber clear of the status bar, camera cutout, gesture bar and keyboard (native padding,
   dark bars with light icons). The header's buttons were under the clock and battery icons. iOS and the web app get the
-  proper fix in Chamber itself (T-0338).
+  proper fix in Chamber itself (T-0338). **Verified** by the owner on their Android phone, 2026-11-22 (build a34020b).
 - Docs: README (why native, against ROADMAP.md) and `docs/SOP.md`.
