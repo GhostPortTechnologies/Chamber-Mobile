@@ -1,12 +1,12 @@
 name: Build
 
-# Every push and pull request builds an Android test app (debug APK, downloadable from the run's
-# "Artifacts") and checks that the iOS project compiles for the simulator. Nothing is signed or
-# published here: store builds come later, once the Apple and Google Play accounts exist (T-0323).
+# Pushes to main and feature branches, and every pull request, run the tests, build an Android test app and check
+# that the iOS project compiles. A test app goes to a DRAFT release, which only people who can push to this repo see.
+# Nothing is made public here: that takes the owner's "ship it". Store builds come later (T-0323).
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/**", "fix/**"]
   pull_request:
   workflow_dispatch:
 
@@ -22,7 +22,7 @@ jobs:
     name: Android (debug APK)
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # only to publish the test-build pre-release
+      contents: write   # only for the draft test-build release
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -37,6 +37,16 @@ jobs:
           cache: gradle
       - run: npm ci
       - run: npx cap sync android
+      - name: Firebase config (if the secret is set)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+        shell: bash
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          else
+            echo "::warning::ANDROID_GOOGLE_SERVICES_JSON is not set: this build works, but push stays off."
+          fi
       - name: Stable test signing key (if the secret is set)
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
@@ -55,22 +65,17 @@ jobs:
           ANDROID_TEST_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_TEST_KEYSTORE_PASSWORD }}
         run: |
           set -o pipefail
-          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle-build.log
+          ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug 2>&1 | tee gradle-build.log
       - name: Report the Gradle error
         if: failure()
         working-directory: android
         shell: bash
         run: |
           # Turn the important lines into annotations, which show on the PR and through the public API.
-          grep -E -A12 "What went wrong|^e: |error:|Could not|FAILURE" gradle-build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chamber-android-debug-${{ github.sha }}
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 14
-      # A direct link that works on a phone (no zip, no sign-in): one pre-release per branch, replaced on every build.
-      # Debug builds only; the repo is public anyway. Skipped for PRs from forks, which get a read-only token.
-      - name: Publish test build (direct phone download)
+          grep -E -A12 "What went wrong|^e: |error:| FAILED|Could not|FAILURE" gradle-build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
+      # No artifact: on a public repo anyone signed in to GitHub could download it. A draft release is private.
+      # One per branch, replaced on every build. Skipped for PRs from forks, which get a read-only token.
+      - name: Save the private test build (draft release)
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
@@ -81,13 +86,17 @@ jobs:
           APK="chamber-${TAG}.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
           NOTES="Test build of branch ${BRANCH} (commit ${GITHUB_SHA::7}). Debug build for testing only, not for the store. Install: tap ${APK} below. See docs/SOP.md section 3."
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --notes "$NOTES" --prerelease
+          if DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$DRAFT" != "true" ]; then
+              echo "::warning::$TAG is already public, so this build was not uploaded to it."
+              exit 0
+            fi
+            gh release edit "$TAG" --notes "$NOTES"
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --prerelease --target "$GITHUB_SHA" --title "Test build: ${BRANCH}" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --draft --prerelease --target "$GITHUB_SHA" --title "Test build: ${BRANCH}" --notes "$NOTES"
           fi
-          echo "::notice::Phone download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APK}"
+          echo "::notice::Private test build saved as a draft. Signed in to GitHub, open https://github.com/${GITHUB_REPOSITORY}/releases and tap ${APK}"
 
   ios:
     name: iOS (simulator build, unsigned)

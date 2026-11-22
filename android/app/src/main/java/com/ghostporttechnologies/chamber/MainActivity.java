@@ -1,9 +1,11 @@
 package com.ghostporttechnologies.chamber;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.CookieManager;
 import android.webkit.WebView;
 
 import androidx.core.graphics.Insets;
@@ -13,6 +15,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 /**
  * Keeps Chamber clear of the status bar, camera cutout, gesture bar and keyboard.
@@ -51,5 +54,39 @@ public class MainActivity extends BridgeActivity {
             return WindowInsetsCompat.CONSUMED;
         });
         ViewCompat.requestApplyInsets(container);
+
+        // Signing in loads a page, so that is when push can first be set up.
+        getBridge().addWebViewListener(new WebViewListener() {
+            @Override
+            public void onPageLoaded(WebView view) {
+                ChamberPush.start(MainActivity.this);
+            }
+        });
+        if (savedInstanceState == null) openFromNotification(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        openFromNotification(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        ChamberPush.start(this);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush(); // so a push that starts the app cold still finds the session
+    }
+
+    /** Any app can start this activity, so the only thing taken from the intent is a well-formed message id. */
+    private void openFromNotification(Intent intent) {
+        if (intent == null || getBridge() == null) return;
+        String id = intent.getStringExtra(ChamberNotifier.EXTRA_MESSAGE);
+        if (AskRules.validMessageId(id)) getBridge().getWebView().loadUrl(ChamberApi.ORIGIN + "/app#m=" + id);
     }
 }

@@ -17,7 +17,7 @@ build it now. Notifications weren't reaching the owner, and these planned featur
 | Feature | Ticket | Status |
 |---|---|---|
 | Native shell, icons, offline page, CI builds | — | this PR |
-| Native push (FCM / APNs), still content-free like `push.js` | — | next |
+| Native push, content-free like `push.js` | T-0335 | Android code in PR #2, needs Firebase and the server half; iOS needs an Apple account |
 | Fingerprint / Face ID before approving | T-0318 | planned |
 | Driving mode: approvals wait until you've stopped | T-0321 | planned |
 
@@ -35,8 +35,8 @@ build it now. Notifications weren't reaching the owner, and these planned featur
 
 Every push and pull request runs `.github/workflows/build.yml`:
 
-- **Android:** a debug APK. Download it from the run's *Artifacts*, unzip it, and install it on a phone
-  (allow "install unknown apps" for your browser or file manager).
+- **Android:** unit tests, then a debug APK in a draft release, visible to people who can push to this repo
+  (see docs/SOP.md, section 3).
 - **iOS:** an unsigned build for the simulator, to prove the project compiles. Building for real iPhones needs the
   Apple Developer account (T-0323).
 

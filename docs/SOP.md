@@ -17,7 +17,7 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 
 | Job | Runs on | Produces |
 |---|---|---|
-| Android (debug APK) | ubuntu-latest | `chamber-android-debug-<sha>` artifact, kept 14 days |
+| Android (debug APK) | ubuntu-latest | unit tests, then an APK in a private draft release `test-<branch>` |
 | iOS (simulator build, unsigned) | macos-latest | nothing, just proves the Xcode project compiles |
 
 - Builds run on GitHub Actions, so contributors don't need the Android SDK or a Mac.
@@ -26,9 +26,8 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 
 ## 3. Testing a build on a phone
 
-1. **On a phone:** open the direct link from the build, `https://github.com/GhostPortTechnologies/Chamber-Mobile/releases/download/test-<branch>/chamber-test-<branch>.apk`
-   (also on the **Releases** page as "Test build: <branch>"). No zip and no sign-in needed.
-   On a computer you can use the run's **Artifacts** zip instead (needs a GitHub sign-in, and doesn't work well on phones).
+1. Signed in to GitHub, open **Releases** and find the draft "Test build: <branch>". Drafts are visible only to
+   people who can push to this repo. Nothing becomes a public download until the owner says "ship it".
 2. Tap the `.apk`. Allow installs from Files or the browser for this install only, then turn it
    off again (Android: Settings → Apps → Special app access → Install unknown apps).
 3. Check, every time:
@@ -38,6 +37,10 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
    - [ ] You can sign in, and you're still signed in after the app is closed and reopened
    - [ ] Links to other sites open in the system browser, not inside the app
    - [ ] In airplane mode, the app shows "Chamber is offline", and "Try again" works once you're back online
+   - [ ] Push: Settings > Notifications test appears with the app closed
+   - [ ] A short command question shows Allow once and Deny, and the phone asks to be unlocked before either works
+   - [ ] A long command shows no buttons, and a tap opens the question
+   - [ ] On the lock screen, neither the agent's name nor the command shows
    - [ ] Anything the PR itself adds (push, biometrics, driving mode…)
 4. Report the result in the PR or in #general. Merge only after the checks pass.
 
@@ -68,5 +71,6 @@ different app. Uninstall the test build first.
 |---|---|---|
 | 2026-11-21 | First Android build failed and the full log needs a GitHub sign-in | CI posts Gradle errors as public annotations (section 2) |
 | 2026-11-21 | `@capacitor/assets` made an adaptive icon pointing to `@mipmap/ic_launcher_background`, which it never generated, and defaulted to white | Icon background is the color resource `#0A0D0B`. After regenerating icons, check `mipmap-anydpi-v26/*.xml` |
+| 2026-11-22 | `allowBackup` was left on, so Android could copy the sign-in to cloud backup | Backup and device transfer are off |
 | 2026-11-22 | A new test APK wouldn't install over the old one: every CI build had its own random debug key | One stable test key from GitHub secrets, and versionCode = CI run number |
 | 2026-11-21 | Tapping the Actions artifact on a phone did nothing (zip, sign-in only) | CI also publishes each branch's APK as a `test-<branch>` pre-release, a direct link |
