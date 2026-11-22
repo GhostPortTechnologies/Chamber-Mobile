@@ -41,6 +41,10 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
    - [ ] Anything the PR itself adds (push, biometrics, driving mode…)
 4. Report the result in the PR or in #general. Merge only after the checks pass.
 
+Test builds are signed with one stable test key (GitHub secrets `ANDROID_TEST_KEYSTORE_B64` and
+`ANDROID_TEST_KEYSTORE_PASSWORD`), so each new test APK installs as an update. If those secrets are missing, every
+build gets a one-off key and Android refuses the update ("app not installed"): uninstall the old one first.
+
 Debug APKs are for testing only. They're signed with a throwaway debug key, so a store build later installs as a
 different app. Uninstall the test build first.
 
@@ -64,4 +68,5 @@ different app. Uninstall the test build first.
 |---|---|---|
 | 2026-11-21 | First Android build failed and the full log needs a GitHub sign-in | CI posts Gradle errors as public annotations (section 2) |
 | 2026-11-21 | `@capacitor/assets` made an adaptive icon pointing to `@mipmap/ic_launcher_background`, which it never generated, and defaulted to white | Icon background is the color resource `#0A0D0B`. After regenerating icons, check `mipmap-anydpi-v26/*.xml` |
+| 2026-11-22 | A new test APK wouldn't install over the old one: every CI build had its own random debug key | One stable test key from GitHub secrets, and versionCode = CI run number |
 | 2026-11-21 | Tapping the Actions artifact on a phone did nothing (zip, sign-in only) | CI also publishes each branch's APK as a `test-<branch>` pre-release, a direct link |

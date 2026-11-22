@@ -37,9 +37,22 @@ jobs:
           cache: gradle
       - run: npm ci
       - run: npx cap sync android
+      - name: Stable test signing key (if the secret is set)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
+        shell: bash
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/test-signing.keystore"
+            echo "ANDROID_TEST_KEYSTORE_FILE=$RUNNER_TEMP/test-signing.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_TEST_KEYSTORE_B64 is not set: this APK uses a one-off key and won't install over an earlier test build (uninstall first)."
+          fi
       - name: Build debug APK
         working-directory: android
         shell: bash
+        env:
+          ANDROID_TEST_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_TEST_KEYSTORE_PASSWORD }}
         run: |
           set -o pipefail
           ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle-build.log

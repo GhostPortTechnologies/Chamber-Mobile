@@ -7,8 +7,9 @@ android {
         applicationId "com.ghostporttechnologies.chamber"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // CI numbers every build so each test APK installs as an update over the last one.
+        versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+        versionName "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,7 +17,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // One stable key for test builds, so a new test APK updates the installed app instead of being refused.
+        // The keystore comes from the ANDROID_TEST_KEYSTORE_* GitHub secrets and is never in this repo.
+        // Without them (forks, local builds) Gradle's own debug key is used.
+        chamberTest {
+            def ks = System.getenv("ANDROID_TEST_KEYSTORE_FILE")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("ANDROID_TEST_KEYSTORE_PASSWORD")
+                keyAlias "chamber-test"
+                keyPassword System.getenv("ANDROID_TEST_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (System.getenv("ANDROID_TEST_KEYSTORE_FILE")) {
+                signingConfig signingConfigs.chamberTest
+            }
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
