@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Chamber</string>
+    <string name="title_activity_main">Chamber</string>
+    <string name="package_name">com.ghostporttechnologies.chamber</string>
+    <string name="custom_url_scheme">com.ghostporttechnologies.chamber</string>
+</resources>

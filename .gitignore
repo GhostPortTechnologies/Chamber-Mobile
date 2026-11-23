@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+
+# Signing material never goes in this repo
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+.env

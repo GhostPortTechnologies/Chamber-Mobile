@@ -1,0 +1,24 @@
+{
+  "name": "chamber-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chamber for Android and iOS: the hosted Chamber app in a native shell, with native push, biometric approvals and driving mode to follow.",
+  "license": "AGPL-3.0-only",
+  "repository": "github:GhostPortTechnologies/chamber-mobile",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync": "cap sync",
+    "android:sync": "cap sync android",
+    "ios:sync": "cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2"
+  }
+}
