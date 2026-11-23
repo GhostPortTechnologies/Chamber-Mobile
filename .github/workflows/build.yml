@@ -98,6 +98,60 @@ jobs:
           fi
           echo "::notice::Private test build saved as a draft. Signed in to GitHub, open https://github.com/${GITHUB_REPOSITORY}/releases and tap ${APK}"
 
+  native-android:
+    name: Native Android (Kotlin, T-0358)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only for the draft test-build release
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: native/android
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - name: Stable test signing key (if the secret is set)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/test-signing.keystore"
+            echo "ANDROID_TEST_KEYSTORE_FILE=$RUNNER_TEMP/test-signing.keystore" >> "$GITHUB_ENV"
+          fi
+      - name: Tests and debug APK
+        env:
+          ANDROID_TEST_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_TEST_KEYSTORE_PASSWORD }}
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug 2>&1 | tee build.log
+      - name: Report the Gradle error
+        if: failure()
+        run: |
+          grep -E -A12 "What went wrong|^e: |error:| FAILED" build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
+      - name: Save the private test build (draft release)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          TAG="native-$(echo "$BRANCH" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
+          APK="chamber-${TAG}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$APK"
+          NOTES="Native app test build of ${BRANCH} (commit ${GITHUB_SHA::7}). Installs as 'Chamber' (dev) next to the current app. Testing only."
+          if DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            [ "$DRAFT" = "true" ] || { echo "::warning::$TAG is public, so this build was not uploaded."; exit 0; }
+            gh release edit "$TAG" --notes "$NOTES"
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --draft --prerelease --target "$GITHUB_SHA" --title "Native test build: ${BRANCH}" --notes "$NOTES"
+          fi
+          echo "::notice::Private native test build saved as draft release $TAG"
+
   ios:
     name: iOS (simulator build, unsigned)
     runs-on: macos-latest
