@@ -20,7 +20,13 @@ import java.util.concurrent.TimeUnit
 const val CHAMBER_ORIGIN = "https://chamber.ghostporttechnologies.com"
 
 /** What went wrong, in words a person can act on. [status] 0 = Chamber couldn't be reached. */
-class ChamberException(val status: Int, override val message: String, val locked: Boolean = false) : Exception(message) {
+class ChamberException(
+    val status: Int,
+    override val message: String,
+    val locked: Boolean = false,
+    /** The server wants the password again before this action (T-0241 re-check). */
+    val recheck: Boolean = false,
+) : Exception(message) {
     val signedOut get() = status == 401
 }
 
@@ -52,7 +58,7 @@ class ChamberApi(private val tokens: () -> String?) {
         try {
             http.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (response.isSuccessful) text else throw ChamberException(response.code, errorText(response.code, text), isLocked(response.code, text))
+                if (response.isSuccessful) text else throw ChamberException(response.code, errorText(response.code, text), isLocked(response.code, text), flag(response.code == 403, text, "recheckRequired"))
             }
         } catch (e: IOException) {
             throw ChamberException(0, "Can't reach Chamber. Check your connection and try again.")
@@ -85,6 +91,47 @@ class ChamberApi(private val tokens: () -> String?) {
         call("/account/activity", buildJsonObject { put("active", active) })
     }
 
+    suspend fun recheck(password: String) {
+        call("/account/recheck", buildJsonObject { put("password", password) })
+    }
+
+    // ── Tickets ─────────────────────────────────────────────────────────────────────────────────
+
+    suspend fun tickets(): List<Ticket> = decode<TicketsReply>(call("/api/tickets")).tickets
+
+    /** The change on a ticket, or null when it carries none (404). */
+    suspend fun diff(id: String): DiffReply? = try {
+        decode(call("/api/tickets/${path(id)}/diff"))
+    } catch (e: ChamberException) {
+        if (e.status == 404) null else throw e
+    }
+
+    /**
+     * Approve or reject. [version] is the version of the change the person was shown: Chamber refuses the approval
+     * if the agent replaced the change after it was opened.
+     */
+    suspend fun decide(id: String, approve: Boolean, by: String, reason: String? = null, version: Int? = null) {
+        call("/api/tickets/${path(id)}/" + (if (approve) "approve" else "reject"), buildJsonObject {
+            put("by", by)
+            if (reason != null) put("reason", reason)
+            if (version != null) put("version", version)
+        })
+    }
+
+    // ── Agents' questions ───────────────────────────────────────────────────────────────────────
+
+    suspend fun waitingAsks(): List<Ask> = decode<AsksReply>(call("/api/asks?status=waiting")).asks.filter { it.canAnswer }
+
+    suspend fun answer(id: String, allow: Boolean) {
+        call("/api/asks/${path(id)}/answer", buildJsonObject { put("decision", if (allow) "allow" else "deny") })
+    }
+
+    /** Ids come from Chamber, but never let one steer the URL. */
+    private fun path(id: String): String {
+        require(Regex("^[A-Za-z0-9-]{1,40}$").matches(id)) { "bad id" }
+        return id
+    }
+
     suspend fun me(): Me = decode(call("/api/me"))
 
     suspend fun rooms(): Map<String, Room> = decode<RoomsReply>(call("/api/rooms")).rooms
@@ -115,8 +162,10 @@ class ChamberApi(private val tokens: () -> String?) {
                 .filter { !it.isNullOrBlank() }.joinToString(" ").replace(Regex("[^\\x20-\\x7E]"), "").take(40)
         }
 
-        fun isLocked(status: Int, body: String): Boolean = status == 423 && runCatching {
-            (ChamberJson.parseToJsonElement(body).jsonObject["sessionLocked"] as? JsonPrimitive)?.contentOrNull == "true"
+        fun isLocked(status: Int, body: String): Boolean = flag(status == 423, body, "sessionLocked")
+
+        fun flag(statusMatches: Boolean, body: String, name: String): Boolean = statusMatches && runCatching {
+            (ChamberJson.parseToJsonElement(body).jsonObject[name] as? JsonPrimitive)?.contentOrNull == "true"
         }.getOrDefault(false)
 
         /** Chamber answers errors as {error: "..."} written for people, so show that, never a raw code. */
