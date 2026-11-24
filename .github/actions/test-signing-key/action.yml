@@ -1,0 +1,19 @@
+name: Stable test signing key
+description: Puts the test keystore from the secret in a temp file and points ANDROID_TEST_KEYSTORE_FILE at it. Without the secret, builds use a one-off key.
+inputs:
+  keystore-b64:
+    description: secrets.ANDROID_TEST_KEYSTORE_B64
+    required: false
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        KEYSTORE_B64: ${{ inputs.keystore-b64 }}
+      run: |
+        if [ -n "$KEYSTORE_B64" ]; then
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/test-signing.keystore"
+          echo "ANDROID_TEST_KEYSTORE_FILE=$RUNNER_TEMP/test-signing.keystore" >> "$GITHUB_ENV"
+        else
+          echo "::warning::ANDROID_TEST_KEYSTORE_B64 is not set: this APK uses a one-off key and won't install over an earlier test build (uninstall first)."
+        fi

@@ -48,16 +48,9 @@ jobs:
             echo "::warning::ANDROID_GOOGLE_SERVICES_JSON is not set: this build works, but push stays off."
           fi
       - name: Stable test signing key (if the secret is set)
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
-        shell: bash
-        run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/test-signing.keystore"
-            echo "ANDROID_TEST_KEYSTORE_FILE=$RUNNER_TEMP/test-signing.keystore" >> "$GITHUB_ENV"
-          else
-            echo "::warning::ANDROID_TEST_KEYSTORE_B64 is not set: this APK uses a one-off key and won't install over an earlier test build (uninstall first)."
-          fi
+        uses: ./.github/actions/test-signing-key
+        with:
+          keystore-b64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
       - name: Build debug APK
         working-directory: android
         shell: bash
@@ -68,13 +61,9 @@ jobs:
           ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug 2>&1 | tee gradle-build.log
       - name: Signing fingerprint (to check the CI key is the expected one)
         if: success()
-        shell: bash
-        run: |
-          # apksigner reads the v2/v3 signature (keytool only reads old v1 JAR signatures). Never fails the job.
-          APK=$(ls android/app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1) || true
-          SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1) || true
-          FP=$("$SIGNER" verify --print-certs "$APK" 2>/dev/null | grep -m1 "SHA-256 digest" | sed 's/.*: *//') || true
-          echo "::notice::APK signing SHA-256: ${FP:-unknown}"
+        uses: ./.github/actions/apk-fingerprint
+        with:
+          apk-dir: android/app/build/outputs/apk/debug
       - name: Report the Gradle error
         if: failure()
         working-directory: android
@@ -124,14 +113,17 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - name: Stable test signing key (if the secret is set)
+      - name: Firebase config (if the secret has the native debug app in it)
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/test-signing.keystore"
-            echo "ANDROID_TEST_KEYSTORE_FILE=$RUNNER_TEMP/test-signing.keystore" >> "$GITHUB_ENV"
-          fi
+          # Gradle turns push on only if this config lists com.ghostporttechnologies.chamber.dev.
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          else echo "::warning::ANDROID_GOOGLE_SERVICES_JSON is not set: the native build works, but push stays off."; fi
+      - name: Stable test signing key (if the secret is set)
+        uses: ./.github/actions/test-signing-key
+        with:
+          keystore-b64: ${{ secrets.ANDROID_TEST_KEYSTORE_B64 }}
       - name: Tests and debug APK
         env:
           ANDROID_TEST_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_TEST_KEYSTORE_PASSWORD }}
@@ -140,12 +132,9 @@ jobs:
           ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug 2>&1 | tee build.log
       - name: Signing fingerprint (to check the CI key is the expected one)
         if: success()
-        run: |
-          # apksigner reads the v2/v3 signature (keytool only reads old v1 JAR signatures). Never fails the job.
-          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1) || true
-          SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1) || true
-          FP=$("$SIGNER" verify --print-certs "$APK" 2>/dev/null | grep -m1 "SHA-256 digest" | sed 's/.*: *//') || true
-          echo "::notice::APK signing SHA-256: ${FP:-unknown}"
+        uses: ./.github/actions/apk-fingerprint
+        with:
+          apk-dir: native/android/app/build/outputs/apk/debug
       - name: Report the Gradle error
         if: failure()
         run: |

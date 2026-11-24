@@ -1,5 +1,6 @@
 package com.ghostporttechnologies.chamber.ui
 
+import com.ghostporttechnologies.chamber.push.AskRules
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -180,12 +181,12 @@ fun QuestionsScreen(asks: List<Ask>, busy: Boolean, error: String?, notice: Stri
             items(asks, key = { it.id }) { a ->
                 val command = a.tool == "Bash"
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("${a.agent} asks: " + if (command) "may I run this command?" else "may I do this?", fontWeight = FontWeight.Bold)
+                    Text("${AskRules.visible(a.agent, 40)} asks: " + if (command) "may I run this command?" else "may I do this?", fontWeight = FontWeight.Bold)
                     Text("${a.id}${a.ticket?.let { " · $it" } ?: ""} · no answer by ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(a.expiresAt))} means no",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     // The whole request, wrapped, never cut: the person reads everything they allow.
                     Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        Text(a.summary.removePrefix("run this command: "), fontFamily = FontFamily.Monospace, modifier = Modifier.padding(8.dp))
+                        Text(AskRules.visible(AskRules.command(a.summary), Int.MAX_VALUE), fontFamily = FontFamily.Monospace, modifier = Modifier.padding(8.dp))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { onAllow(a) }, enabled = !busy) { Text("Allow once") }

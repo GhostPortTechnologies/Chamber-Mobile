@@ -122,8 +122,35 @@ class ChamberApi(private val tokens: () -> String?) {
 
     suspend fun waitingAsks(): List<Ask> = decode<AsksReply>(call("/api/asks?status=waiting")).asks.filter { it.canAnswer }
 
-    suspend fun answer(id: String, allow: Boolean) {
-        call("/api/asks/${path(id)}/answer", buildJsonObject { put("decision", if (allow) "allow" else "deny") })
+    suspend fun answer(id: String, allow: Boolean, fromNotification: Boolean = false) {
+        call("/api/asks/${path(id)}/answer", buildJsonObject {
+            put("decision", if (allow) "allow" else "deny")
+            if (fromNotification) put("via", "notification")
+        })
+    }
+
+    /** One question as it is now, so a notification button can check it is still the one it showed. */
+    suspend fun ask(id: String): Ask = decode(call("/api/asks/${path(id)}"))
+
+    // ── Push (T-0355): Chamber only learns this phone's push token. Pushes carry no content. ───────
+
+    /** 503 means the server has no Firebase key yet; the app just tries again later. */
+    suspend fun registerPush(token: String, name: String) {
+        call("/account/push", buildJsonObject {
+            put("device", buildJsonObject {
+                put("platform", "android")
+                put("provider", "fcm")
+                put("token", token)
+                put("name", name)
+            })
+        })
+    }
+
+    /** Settings > Notifications > Send a test: is this push that test? */
+    suspend fun pushTest(): PushTest = decode(call("/account/push/test"))
+
+    suspend fun pushTestShown(nonce: String) {
+        call("/account/push/test/shown", buildJsonObject { put("nonce", nonce) })
     }
 
     /** Ids come from Chamber, but never let one steer the URL. */

@@ -11,7 +11,8 @@ import com.ghostporttechnologies.chamber.data.LoginReply
 import com.ghostporttechnologies.chamber.data.Message
 import com.ghostporttechnologies.chamber.data.Room
 import com.ghostporttechnologies.chamber.data.Ticket
-import com.ghostporttechnologies.chamber.data.TokenVault
+import com.ghostporttechnologies.chamber.data.Chamber
+import com.ghostporttechnologies.chamber.push.Push
 import com.ghostporttechnologies.chamber.data.changes
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,14 +63,15 @@ data class UiState(
 
 class AppState(app: Application) : AndroidViewModel(app) {
 
-    private val vault = TokenVault(app)
-    private val api = ChamberApi { vault.read() }
+    private val vault = Chamber.vault(app)
+    private val api = Chamber.api(app)
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui.asStateFlow()
     private var live: Job? = null
     private var presence: Job? = null
     private var afterRecheck: (suspend () -> Unit)? = null
     @Volatile private var touched = false
+    private var questionsNext = false
 
     init {
         if (vault.read() == null) show(Screen.SignIn()) else start()
@@ -119,6 +121,7 @@ class AppState(app: Application) : AndroidViewModel(app) {
     private fun signedOut() {
         live?.cancel()
         presence?.cancel()
+        Push.signedOut(getApplication<Application>()) // no more pushes for this session, and its notifications leave the screen
         vault.clear()
         _ui.value = UiState(screen = Screen.SignIn())
     }
@@ -137,6 +140,7 @@ class AppState(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(screen = then, busy = false, error = null) }
         listen()
         (then as? Screen.Chat)?.let { refreshChat(it.room) }
+        if (then == Screen.Questions) refreshAsks()
     }
 
     fun lockNow() = work {
@@ -171,8 +175,11 @@ class AppState(app: Application) : AndroidViewModel(app) {
     private fun start() = work {
         val me = api.me()
         val rooms = api.rooms()
-        _ui.update { it.copy(me = me.username, rooms = rooms, screen = Screen.Rooms, busy = false, error = null) }
+        val first = if (questionsNext) Screen.Questions else Screen.Rooms
+        questionsNext = false
+        _ui.update { it.copy(me = me.username, rooms = rooms, screen = first, busy = false, error = null) }
         listen()
+        if (first == Screen.Questions) refreshAsks()
     }
 
     private fun listen() {
@@ -200,6 +207,16 @@ class AppState(app: Application) : AndroidViewModel(app) {
     fun openRoom(room: String) {
         _ui.update { it.copy(screen = Screen.Chat(room), chat = ChatState(), error = null) }
         work { refreshChat(room) }
+    }
+
+    /** A tap on a notification about an agent's question. Never skips sign-in or the screen lock. */
+    fun openQuestions() {
+        when (val now = _ui.value.screen) {
+            Screen.Starting -> questionsNext = true
+            is Screen.SignIn -> questionsNext = true
+            is Screen.Locked -> _ui.update { it.copy(screen = Screen.Locked(Screen.Questions)) }
+            else -> if (now != Screen.Questions) tab(Screen.Questions) else work { refreshAsks() }
+        }
     }
 
     fun back() {

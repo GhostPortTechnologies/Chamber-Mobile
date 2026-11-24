@@ -1,5 +1,10 @@
 package com.ghostporttechnologies.chamber
 
+import com.ghostporttechnologies.chamber.push.AskRules
+import com.ghostporttechnologies.chamber.push.Notifier
+import com.ghostporttechnologies.chamber.push.Push
+import androidx.compose.runtime.LaunchedEffect
+import android.content.Intent
 import android.os.Bundle
 import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
@@ -36,10 +41,13 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge() // native screens keep themselves clear of the status bar, cutouts and gesture bar
+        if (savedInstanceState == null) openFrom(intent)
         setContent {
             ChamberTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val ui by state.ui.collectAsStateWithLifecycle()
+                    val signedIn = ui.screen !is Screen.SignIn && ui.screen != Screen.Starting
+                    LaunchedEffect(signedIn) { if (signedIn) Push.start(this@MainActivity) } // right after sign-in too
                     val tabs: @androidx.compose.runtime.Composable (Tab) -> Unit = { current ->
                         BottomTabs(current, ui.asks.size) { tab ->
                             state.tab(when (tab) { Tab.Chat -> Screen.Rooms; Tab.Tickets -> Screen.Tickets; Tab.Questions -> Screen.Questions })
@@ -66,7 +74,7 @@ class MainActivity : FragmentActivity() {
                             }
                             Screen.Questions -> QuestionsScreen(ui.asks, ui.busy, ui.error, ui.notice, { tabs(Tab.Questions) },
                                 onAllow = { ask ->
-                                    confirmItsYou("Allow ${ask.agent} once?", ask.summary.removePrefix("run this command: ").take(120)) { problem ->
+                                    confirmItsYou("Allow ${AskRules.visible(ask.agent, 40)} once?", AskRules.visible(AskRules.command(ask.summary), 120)) { problem ->
                                         if (problem == null) state.answer(ask, true) else state.say(problem)
                                     }
                                 },
@@ -87,6 +95,21 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openFrom(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Push.start(this) // picks up a permission or token change; does nothing before sign-in
+    }
+
+    /** Any app can start this activity, so the only thing taken from the intent is one known word. */
+    private fun openFrom(intent: Intent?) {
+        if (intent?.getStringExtra(Notifier.EXTRA_OPEN) == Notifier.OPEN_QUESTIONS) state.openQuestions()
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

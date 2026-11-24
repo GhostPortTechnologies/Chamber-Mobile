@@ -5,6 +5,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Push needs a Firebase config that knows the debug app id (….chamber.dev). Without one the app builds and works,
+// with push off. The config is a GitHub secret, never in the repo.
+val firebaseConfig = file("google-services.json")
+if (firebaseConfig.exists() && firebaseConfig.readText().contains("\"com.ghostporttechnologies.chamber.dev\"")) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("No Firebase config for com.ghostporttechnologies.chamber.dev: this build has push off.")
+}
+
 android {
     namespace = "com.ghostporttechnologies.chamber"
     compileSdk = 36
@@ -68,6 +77,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.firebase:firebase-messaging:25.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     debugImplementation("androidx.compose.ui:ui-tooling")

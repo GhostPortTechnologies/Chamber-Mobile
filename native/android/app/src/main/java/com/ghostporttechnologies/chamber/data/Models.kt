@@ -118,3 +118,6 @@ data class Ask(
 
 @Serializable
 data class AsksReply(val asks: List<Ask> = emptyList())
+
+@Serializable
+data class PushTest(val test: Boolean = false, val nonce: String = "")

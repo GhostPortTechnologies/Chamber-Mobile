@@ -1,0 +1,18 @@
+name: APK signing fingerprint
+description: Prints the APK's signing SHA-256 as a notice, to check the CI key is the expected one. Never fails the job.
+inputs:
+  apk-dir:
+    description: folder holding the built APK
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        APK_DIR: ${{ inputs.apk-dir }}
+      run: |
+        # apksigner reads the v2/v3 signature (keytool only reads old v1 JAR signatures).
+        APK=$(ls "$APK_DIR"/*.apk 2>/dev/null | head -1) || true
+        SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1) || true
+        FP=$("$SIGNER" verify --print-certs "$APK" 2>/dev/null | grep -m1 "SHA-256 digest" | sed 's/.*: *//') || true
+        echo "::notice::APK signing SHA-256: ${FP:-unknown}"
