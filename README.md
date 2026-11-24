@@ -61,4 +61,13 @@ The full procedures (building, testing a build on a phone, secrets, lessons lear
 
 ## License
 
-AGPL-3.0-only, same as Chamber. Copyright (C) 2026 GhostPort Technologies.
+Source-available under the [Functional Source License, Version 1.1, ALv2 Future License](LICENSE)
+(FSL-1.1-ALv2). Copyright 2026 GhostPort Technologies.
+
+- You may read, use, change and build this code for your own team, for non-commercial education or research, and
+  when providing professional services to someone who uses it under the same license.
+- You may not offer it, or something built from it, as a commercial product or service that competes with Chamber.
+- Each version becomes available under the Apache License 2.0 two years after it is published.
+
+This is a summary; [LICENSE](LICENSE) has the exact terms. Everything published in this repository before this
+change (24 November 2026) was released under AGPL-3.0-only, and those copies stay under that license.

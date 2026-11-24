@@ -1,5 +1,15 @@
 # Changelog
 
+## License change (24 November 2026)
+
+- Chamber mobile moves from AGPL-3.0-only to the Functional Source License, Version 1.1, ALv2 Future License
+  (FSL-1.1-ALv2), alongside Chamber. Free for your own team; no competing commercial product or service; each
+  version becomes Apache-2.0 two years after it is published.
+- Everything published before this change was released under AGPL-3.0-only, and those copies stay under it.
+- Dependency check before the change (declared dependencies and the npm lockfile): none is GPL or AGPL. Shipped:
+  Capacitor (MIT), tslib (0BSD), Cordova Android, AndroidX, Kotlin, OkHttp, Firebase Messaging (Apache-2.0).
+  The full Gradle dependency tree was not resolved.
+
 ## 0.1.0 (unreleased): PR #1, Capacitor shell
 
 - Capacitor 8 app for Android and iOS that loads the hosted Chamber app

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Chamber for Android and iOS: the hosted Chamber app in a native shell, with native push, biometric approvals and driving mode to follow.",
-  "license": "AGPL-3.0-only",
+  "license": "FSL-1.1-ALv2",
   "repository": "github:GhostPortTechnologies/chamber-mobile",
   "engines": {
     "node": ">=22"
