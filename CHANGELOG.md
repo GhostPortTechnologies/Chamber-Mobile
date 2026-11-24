@@ -9,6 +9,13 @@
 - One shared sign-in vault and API client for screens, push and notification buttons.
 - The Questions screen and the confirm prompt mark hidden characters in an agent's request, like notifications do.
 - CI: the signing-key and fingerprint steps are shared actions (`.github/actions/`), not copies in each job.
+- Driving mode (T-0321), on by default. While Android's activity detection says you're in a vehicle, or you tapped
+  "I'm driving now", the app shows one hold screen with nothing to read or tap, holds its notifications, removes
+  Allow/Deny buttons, and refuses answers from notifications. When the drive ends, one quiet notification says what
+  waited. "I'm not driving" (fingerprint or PIN) pauses it for this trip: until the vehicle has stopped 10 minutes
+  and a new trip starts, or 12 hours. Turning it off completely is in Settings only, behind a plain warning, a tick
+  and fingerprint or PIN, and is refused while the phone says you're in a vehicle. Settings is new (sign out moved
+  there). Not yet: telling agents you're driving (needs the server), a spoken alert, Android Auto.
 
 ## Unreleased: PR #2, Android push (compiled and unit tested only, not tried on a real phone)
 

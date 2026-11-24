@@ -46,7 +46,10 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
    - [ ] A short command question shows Allow once and Deny, and the phone asks to be unlocked before either works
    - [ ] A long command shows no buttons, and a tap opens the question
    - [ ] On the lock screen, neither the agent's name nor the command shows
-   - [ ] Anything the PR itself adds (push, biometrics, driving mode…)
+   - [ ] Driving mode (native app): Settings > "I'm driving now" shows the hold screen at once, with nothing to read
+         or tap; a push meanwhile shows nothing; "I'm not driving" asks for a fingerprint and then the app is back with
+         the "paused for this trip" line; "Turn off driving mode" is refused while the phone says you're in a vehicle
+   - [ ] Anything the PR itself adds (push, biometrics…)
 4. Report the result in the PR or in #general. Merge only after the checks pass.
 
 Test builds are signed with one stable test key (GitHub secrets `ANDROID_TEST_KEYSTORE_B64` and

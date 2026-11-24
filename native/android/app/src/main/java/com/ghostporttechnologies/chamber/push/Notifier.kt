@@ -15,6 +15,7 @@ import com.ghostporttechnologies.chamber.data.Ask
 import com.ghostporttechnologies.chamber.data.Chamber
 import com.ghostporttechnologies.chamber.data.ChamberApi
 import com.ghostporttechnologies.chamber.data.ChamberException
+import com.ghostporttechnologies.chamber.drive.Drive
 import java.util.Date
 
 /**
@@ -44,6 +45,12 @@ object Notifier {
     /** Runs on Firebase's background thread, so it may wait for Chamber. Whatever the push carried is ignored. */
     suspend fun onPush(context: Context) {
         createChannels(context)
+        if (Drive.driving(context)) {
+            // Driving mode (T-0321): nothing to read or tap. It is counted, and summed up once the drive ends.
+            Drive.update(context) { it.copy(held = it.held + 1) }
+            clearAsks(context)
+            return
+        }
         val api = Chamber.api(context)
         val manager = manager(context)
         if (showTest(context, api, manager)) return
@@ -146,6 +153,34 @@ object Notifier {
             .setContentText(detail)
             .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             .setContentIntent(open(context, OPEN_QUESTIONS))
+            .build())
+    }
+
+    /** A drive started: questions with Allow/Deny buttons leave the screen, so nothing asks for a tap on the road. */
+    fun drivingStarted(context: Context) = clearAsks(context)
+
+    private fun clearAsks(context: Context) {
+        val manager = manager(context)
+        manager.activeNotifications.mapNotNull { it.tag }.filter { it.startsWith(ASK_TAG) }.forEach { manager.cancel(it, ID) }
+    }
+
+    /** The drive ended: one quiet summary of what waited, never the content. Agents' questions time out to "no" while held. */
+    suspend fun afterDrive(context: Context) {
+        createChannels(context)
+        val held = Drive.load(context).held
+        val waiting = try { Chamber.api(context).waitingAsks().size } catch (e: ChamberException) { 0 }
+        Drive.update(context) { it.copy(held = 0) }
+        val text = when {
+            waiting == 1 -> "1 agent is waiting for an answer"
+            waiting > 1 -> "$waiting agents are waiting for an answer"
+            held > 0 -> "Something new came in while you were driving"
+            else -> return
+        }
+        manager(context).notify("drive", ID, base(context, NEWS)
+            .setContentTitle("Chamber")
+            .setContentText(text)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(open(context, if (waiting > 0) OPEN_QUESTIONS else null))
             .build())
     }
 

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.ghostporttechnologies.chamber.data.Chamber
 import com.ghostporttechnologies.chamber.data.ChamberException
+import com.ghostporttechnologies.chamber.drive.Drive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,9 @@ class AskAnswerReceiver : BroadcastReceiver() {
     }
 
     private suspend fun answer(context: Context, id: String, tag: String, fingerprint: String, allow: Boolean) {
+        if (Drive.driving(context)) {
+            return Notifier.answered(context, tag, "Not answered", "Driving mode is on. Answer in Chamber once you've stopped.")
+        }
         val api = Chamber.api(context)
         val current = try {
             api.ask(id)

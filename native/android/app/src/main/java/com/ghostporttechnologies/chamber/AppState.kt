@@ -30,6 +30,8 @@ sealed interface Screen {
     data object Tickets : Screen
     data class TicketOpen(val id: String) : Screen
     data object Questions : Screen
+    data object Settings : Screen
+    data object DrivingOff : Screen
 }
 
 data class ChatState(
@@ -223,7 +225,8 @@ class AppState(app: Application) : AndroidViewModel(app) {
         when (_ui.value.screen) {
             is Screen.Chat -> show(Screen.Rooms)
             is Screen.TicketOpen -> show(Screen.Tickets)
-            Screen.Tickets, Screen.Questions -> show(Screen.Rooms)
+            Screen.Tickets, Screen.Questions, Screen.Settings -> show(Screen.Rooms)
+            Screen.DrivingOff -> show(Screen.Settings)
             else -> Unit
         }
     }
