@@ -3,11 +3,14 @@ package com.ghostporttechnologies.chamber
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ghostporttechnologies.chamber.data.Ask
 import com.ghostporttechnologies.chamber.data.ChamberApi
+import com.ghostporttechnologies.chamber.data.DiffReply
 import com.ghostporttechnologies.chamber.data.ChamberException
 import com.ghostporttechnologies.chamber.data.LoginReply
 import com.ghostporttechnologies.chamber.data.Message
 import com.ghostporttechnologies.chamber.data.Room
+import com.ghostporttechnologies.chamber.data.Ticket
 import com.ghostporttechnologies.chamber.data.TokenVault
 import com.ghostporttechnologies.chamber.data.changes
 import kotlinx.coroutines.Job
@@ -23,6 +26,9 @@ sealed interface Screen {
     data object Rooms : Screen
     data class Chat(val room: String) : Screen
     data class Locked(val then: Screen) : Screen
+    data object Tickets : Screen
+    data class TicketOpen(val id: String) : Screen
+    data object Questions : Screen
 }
 
 data class ChatState(
@@ -32,11 +38,24 @@ data class ChatState(
     val sending: Boolean = false,
 )
 
+data class TicketView(
+    val ticket: Ticket? = null,
+    val change: DiffReply? = null,
+    /** True once the change (or the knowledge that there is none) is on screen: approving needs it. */
+    val changeChecked: Boolean = false,
+)
+
 data class UiState(
     val screen: Screen = Screen.Starting,
     val me: String = "",
     val rooms: Map<String, Room> = emptyMap(),
     val chat: ChatState = ChatState(),
+    val tickets: List<Ticket> = emptyList(),
+    val open: TicketView = TicketView(),
+    val asks: List<Ask> = emptyList(),
+    /** Chamber wants the password again before the last action (T-0241). */
+    val recheck: Boolean = false,
+    val notice: String? = null,
     val busy: Boolean = false,
     val error: String? = null,
 )
@@ -49,6 +68,7 @@ class AppState(app: Application) : AndroidViewModel(app) {
     val ui: StateFlow<UiState> = _ui.asStateFlow()
     private var live: Job? = null
     private var presence: Job? = null
+    private var afterRecheck: (suspend () -> Unit)? = null
     @Volatile private var touched = false
 
     init {
@@ -63,7 +83,7 @@ class AppState(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(busy = false, error = (e as? ChamberException)?.message ?: "Something went wrong. Try again.") }
     }
 
-    fun dismissError() = _ui.update { it.copy(error = null) }
+    fun dismissError() = _ui.update { it.copy(error = null, notice = null) }
 
     // ── Signing in ──────────────────────────────────────────────────────────────────────────────
 
@@ -159,6 +179,8 @@ class AppState(app: Application) : AndroidViewModel(app) {
                 api.changes().collect { change ->
                     when (change.kind) {
                         "rooms" -> refreshRooms()
+                        "tickets", "reviews" -> if (_ui.value.screen.let { it is Screen.Tickets || it is Screen.TicketOpen }) refreshTickets()
+                        "asks" -> refreshAsks()
                         "messages" -> (_ui.value.screen as? Screen.Chat)?.let { if (change.room == null || change.room == it.room) refreshChat(it.room) }
                     }
                 }
@@ -178,7 +200,91 @@ class AppState(app: Application) : AndroidViewModel(app) {
     }
 
     fun back() {
-        if (_ui.value.screen is Screen.Chat) show(Screen.Rooms)
+        when (_ui.value.screen) {
+            is Screen.Chat -> show(Screen.Rooms)
+            is Screen.TicketOpen -> show(Screen.Tickets)
+            Screen.Tickets, Screen.Questions -> show(Screen.Rooms)
+            else -> Unit
+        }
+    }
+
+    fun tab(to: Screen) {
+        show(to)
+        when (to) {
+            Screen.Tickets -> work { refreshTickets() }
+            Screen.Questions -> work { refreshAsks() }
+            else -> Unit
+        }
+    }
+
+    // ── Tickets: decisions only inside an opened ticket (CHAMBER-MOBILE-SOP §4) ─────────────────
+
+    private suspend fun refreshTickets() {
+        val tickets = api.tickets()
+        _ui.update { st ->
+            val open = st.open.ticket?.let { cur -> tickets.firstOrNull { it.id == cur.id } }
+            st.copy(tickets = tickets, open = if (open != null) st.open.copy(ticket = open) else st.open)
+        }
+    }
+
+    fun openTicket(id: String) {
+        val ticket = _ui.value.tickets.firstOrNull { it.id == id }
+        _ui.update { it.copy(screen = Screen.TicketOpen(id), open = TicketView(ticket = ticket), error = null, notice = null) }
+        work {
+            val change = api.diff(id)
+            if ((_ui.value.screen as? Screen.TicketOpen)?.id == id) _ui.update { it.copy(open = it.open.copy(change = change, changeChecked = true)) }
+        }
+    }
+
+    /** Called only after the person confirmed with fingerprint or PIN on the opened ticket. */
+    fun decide(approve: Boolean, reason: String?) {
+        val open = _ui.value.open
+        val ticket = open.ticket ?: return
+        if (approve && !open.changeChecked) return
+        guarded {
+            api.decide(ticket.id, approve, _ui.value.me, reason, open.change?.meta?.version)
+            refreshTickets()
+            _ui.update { it.copy(notice = if (approve) "You approved ${ticket.id}." else "You sent ${ticket.id} back.") }
+        }
+    }
+
+    // ── Agents' questions ───────────────────────────────────────────────────────────────────────
+
+    private suspend fun refreshAsks() {
+        val asks = api.waitingAsks()
+        _ui.update { it.copy(asks = asks) }
+    }
+
+    /** Allow is called only after the fingerprint or PIN confirmation; Deny needs none. */
+    fun answer(ask: Ask, allow: Boolean) = guarded {
+        api.answer(ask.id, allow)
+        refreshAsks()
+        _ui.update { it.copy(notice = if (allow) "Allowed once: ${ask.id}." else "You said no to ${ask.id}.") }
+    }
+
+    // ── Password re-check: Chamber asks again before sensitive actions ──────────────────────────
+
+    private fun guarded(action: suspend () -> Unit) = work {
+        try {
+            action()
+        } catch (e: ChamberException) {
+            if (!e.recheck) throw e
+            afterRecheck = action
+            _ui.update { it.copy(recheck = true, busy = false, error = e.message) }
+        }
+    }
+
+    fun recheck(password: String) = work {
+        api.recheck(password)
+        val again = afterRecheck
+        afterRecheck = null
+        _ui.update { it.copy(recheck = false, error = null) }
+        again?.invoke()
+    }
+
+    fun cancelRecheck() {
+        afterRecheck = null
+        _ui.update { it.copy(recheck = false, error = null, notice = "Not sent.") }
     }
 
     private suspend fun refreshChat(room: String) {
