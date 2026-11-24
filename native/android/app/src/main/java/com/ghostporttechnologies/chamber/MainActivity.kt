@@ -1,6 +1,7 @@
 package com.ghostporttechnologies.chamber
 
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ghostporttechnologies.chamber.ui.ChamberTheme
 import com.ghostporttechnologies.chamber.ui.ChatScreen
+import com.ghostporttechnologies.chamber.ui.LockedScreen
 import com.ghostporttechnologies.chamber.ui.RoomsScreen
 import com.ghostporttechnologies.chamber.ui.SignInScreen
 
@@ -36,7 +38,8 @@ class MainActivity : ComponentActivity() {
                         when (val screen = ui.screen) {
                             Screen.Starting -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                             is Screen.SignIn -> SignInScreen(screen.hint, ui.busy, ui.error, state::signIn, state::enterCode)
-                            Screen.Rooms -> RoomsScreen(ui.me, ui.rooms, ui.error, state::openRoom, state::signOut)
+                            Screen.Rooms -> RoomsScreen(ui.me, ui.rooms, ui.error, state::openRoom, state::lockNow, state::signOut)
+                            is Screen.Locked -> LockedScreen(ui.me, ui.busy, ui.error, state::unlock, state::signOut)
                             is Screen.Chat -> {
                                 BackHandler(onBack = state::back)
                                 val room = ui.rooms[screen.room]
@@ -52,5 +55,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) state.touched()
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        state.foreground(true)
+    }
+
+    override fun onStop() {
+        state.foreground(false)
+        super.onStop()
     }
 }

@@ -22,6 +22,7 @@ sealed interface Screen {
     data class SignIn(val mfaToken: String? = null, val hint: String? = null) : Screen
     data object Rooms : Screen
     data class Chat(val room: String) : Screen
+    data class Locked(val then: Screen) : Screen
 }
 
 data class ChatState(
@@ -47,6 +48,8 @@ class AppState(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui.asStateFlow()
     private var live: Job? = null
+    private var presence: Job? = null
+    @Volatile private var touched = false
 
     init {
         if (vault.read() == null) show(Screen.SignIn()) else start()
@@ -56,6 +59,7 @@ class AppState(app: Application) : AndroidViewModel(app) {
 
     private fun fail(e: Throwable) {
         if (e is ChamberException && e.signedOut) return signedOut()
+        if (e is ChamberException && e.locked) return locked()
         _ui.update { it.copy(busy = false, error = (e as? ChamberException)?.message ?: "Something went wrong. Try again.") }
     }
 
@@ -91,8 +95,52 @@ class AppState(app: Application) : AndroidViewModel(app) {
 
     private fun signedOut() {
         live?.cancel()
+        presence?.cancel()
         vault.clear()
         _ui.value = UiState(screen = Screen.SignIn())
+    }
+
+    // ── Screen lock (the server's, T-0241/T-0359) ───────────────────────────────────────────────
+
+    private fun locked() {
+        live?.cancel()
+        val now = _ui.value.screen
+        if (now !is Screen.Locked) _ui.update { it.copy(screen = Screen.Locked(now), busy = false, error = null) }
+    }
+
+    fun unlock(password: String) = work {
+        api.unlock(password)
+        val then = (_ui.value.screen as? Screen.Locked)?.then ?: Screen.Rooms
+        _ui.update { it.copy(screen = then, busy = false, error = null) }
+        listen()
+        (then as? Screen.Chat)?.let { refreshChat(it.room) }
+    }
+
+    fun lockNow() = work {
+        api.lockNow()
+        locked()
+    }
+
+    /** Called for every touch. Only "someone used it since the last report" is sent, never what they did. */
+    fun touched() { touched = true }
+
+    /** While the app is on screen; stops in the background, so the server's "closed" lock rule can apply. */
+    fun foreground(visible: Boolean) {
+        presence?.cancel()
+        if (!visible || vault.read() == null) return
+        presence = viewModelScope.launch {
+            while (true) {
+                val active = touched.also { touched = false }
+                try {
+                    api.activity(active)
+                } catch (e: ChamberException) {
+                    if (e.locked || e.signedOut) { fail(e); return@launch }
+                } catch (e: Throwable) {
+                    // offline: the server counts the gap
+                }
+                kotlinx.coroutines.delay(30_000)
+            }
+        }
     }
 
     // ── Rooms and chat ──────────────────────────────────────────────────────────────────────────

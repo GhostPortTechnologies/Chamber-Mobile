@@ -119,11 +119,45 @@ fun SignInScreen(codeHint: String?, busy: Boolean, error: String?, onPassword: (
     }
 }
 
+@Composable
+fun LockedScreen(me: String, busy: Boolean, error: String?, onUnlock: (String) -> Unit, onSignOut: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxSize().padding(24.dp).imePadding(), verticalArrangement = Arrangement.Center) {
+        Brand()
+        Spacer(Modifier.height(16.dp))
+        Text("Chamber is locked on this phone.", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Unlock with the password for $me. Chamber locks after a while without use, or when it was closed, as your workspace's rules say.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(
+            value = password, onValueChange = { password = it }, singleLine = true,
+            label = { Text("Password") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { if (!busy && password.isNotEmpty()) { onUnlock(password); password = "" } }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        ErrorLine(error)
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { onUnlock(password); password = "" },
+            enabled = !busy && password.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) { if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("Unlock") }
+        TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out instead") }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoomsScreen(me: String, rooms: Map<String, Room>, error: String?, onOpen: (String) -> Unit, onSignOut: () -> Unit) {
+fun RoomsScreen(me: String, rooms: Map<String, Room>, error: String?, onOpen: (String) -> Unit, onLock: () -> Unit, onSignOut: () -> Unit) {
     Scaffold(topBar = {
-        TopAppBar(title = { Brand() }, actions = { TextButton(onClick = onSignOut) { Text("Sign out") } })
+        TopAppBar(title = { Brand() }, actions = {
+            TextButton(onClick = onLock) { Text("Lock") }
+            TextButton(onClick = onSignOut) { Text("Sign out") }
+        })
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
             item {

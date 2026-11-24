@@ -47,6 +47,7 @@ fun ChamberApi.changes(): Flow<ChangeEvent> = flow {
             http.newBuilder().readTimeout(60, java.util.concurrent.TimeUnit.SECONDS).build()
                 .newCall(request("/api/events").header("Accept", "text/event-stream").build()).execute().use { response ->
                     if (response.code == 401) throw ChamberException(401, "You're signed out. Sign in again.")
+                    if (response.code == 423) throw ChamberException(423, "Chamber is locked on this phone.", locked = true)
                     val source = response.body?.source() ?: return@use
                     wait = 1_000L
                     val parser = SseParser()

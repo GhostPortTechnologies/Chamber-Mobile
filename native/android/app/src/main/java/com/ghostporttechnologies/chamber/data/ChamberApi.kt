@@ -1,5 +1,6 @@
 package com.ghostporttechnologies.chamber.data
 
+import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -19,7 +20,7 @@ import java.util.concurrent.TimeUnit
 const val CHAMBER_ORIGIN = "https://chamber.ghostporttechnologies.com"
 
 /** What went wrong, in words a person can act on. [status] 0 = Chamber couldn't be reached. */
-class ChamberException(val status: Int, override val message: String) : Exception(message) {
+class ChamberException(val status: Int, override val message: String, val locked: Boolean = false) : Exception(message) {
     val signedOut get() = status == 401
 }
 
@@ -38,7 +39,10 @@ class ChamberApi(private val tokens: () -> String?) {
         .build()
 
     fun request(path: String): Request.Builder {
-        val builder = Request.Builder().url(CHAMBER_ORIGIN + path).header("Accept", "application/json")
+        val builder = Request.Builder().url(CHAMBER_ORIGIN + path)
+            .header("Accept", "application/json")
+            // T-0359: the session shows as "Chamber app on <phone>" and gets the screen lock and re-check, like a browser.
+            .header("X-Chamber-App", APP_HEADER)
         tokens()?.let { builder.header("Authorization", "Bearer $it") }
         return builder
     }
@@ -48,7 +52,7 @@ class ChamberApi(private val tokens: () -> String?) {
         try {
             http.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (response.isSuccessful) text else throw ChamberException(response.code, errorText(response.code, text))
+                if (response.isSuccessful) text else throw ChamberException(response.code, errorText(response.code, text), isLocked(response.code, text))
             }
         } catch (e: IOException) {
             throw ChamberException(0, "Can't reach Chamber. Check your connection and try again.")
@@ -65,6 +69,20 @@ class ChamberApi(private val tokens: () -> String?) {
 
     suspend fun logout() {
         runCatching { call("/account/logout", buildJsonObject { }) }
+    }
+
+    /** The phone's screen lock is Chamber's: the server decides when this session locks, the app shows it. */
+    suspend fun unlock(password: String) {
+        call("/account/unlock", buildJsonObject { put("password", password) })
+    }
+
+    suspend fun lockNow() {
+        runCatching { call("/account/lock", buildJsonObject { put("reason", "manual") }) }
+    }
+
+    /** "The app is open", and "a person used it" when they did, as the web page reports it. */
+    suspend fun activity(active: Boolean) {
+        call("/account/activity", buildJsonObject { put("active", active) })
     }
 
     suspend fun me(): Me = decode(call("/api/me"))
@@ -91,6 +109,16 @@ class ChamberApi(private val tokens: () -> String?) {
     private inline fun <reified T> decode(text: String): T = ChamberJson.decodeFromString(text)
 
     companion object {
+        /** Lazy: the phone model only exists on a phone, not in plain unit tests. */
+        val APP_HEADER: String by lazy {
+            "android; " + listOf(Build.MANUFACTURER, Build.MODEL)
+                .filter { !it.isNullOrBlank() }.joinToString(" ").replace(Regex("[^\\x20-\\x7E]"), "").take(40)
+        }
+
+        fun isLocked(status: Int, body: String): Boolean = status == 423 && runCatching {
+            (ChamberJson.parseToJsonElement(body).jsonObject["sessionLocked"] as? JsonPrimitive)?.contentOrNull == "true"
+        }.getOrDefault(false)
+
         /** Chamber answers errors as {error: "..."} written for people, so show that, never a raw code. */
         fun errorText(status: Int, body: String): String {
             val said = runCatching {
