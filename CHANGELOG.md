@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: native Android app (T-0358), push (T-0349)
+
+- Native push, ported from the PR #2 Java code to Kotlin: same rules (content-free wake-up, Allow/Deny only for short
+  readable commands and only after unlocking, nothing on the lock screen). A tap opens the Questions tab.
+  Signing out drops the push token and clears Chamber's notifications. Push stays off until the Firebase config lists
+  the `.dev` test app. Built and unit tested in CI, not yet tried on a phone.
+- One shared sign-in vault and API client for screens, push and notification buttons.
+- The Questions screen and the confirm prompt mark hidden characters in an agent's request, like notifications do.
+- CI: the signing-key and fingerprint steps are shared actions (`.github/actions/`), not copies in each job.
+
 ## Unreleased: PR #2, Android push (compiled and unit tested only, not tried on a real phone)
 
 - Native Firebase push that carries no content. The phone asks Chamber what is waiting, as `sw.js` does.

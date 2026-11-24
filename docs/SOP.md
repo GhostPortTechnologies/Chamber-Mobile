@@ -18,9 +18,14 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 | Job | Runs on | Produces |
 |---|---|---|
 | Android (debug APK) | ubuntu-latest | unit tests, then an APK in a private draft release `test-<branch>` |
+| Native Android (Kotlin) | ubuntu-latest | unit tests, then an APK in a private draft release `native-<branch>` |
 | iOS (simulator build, unsigned) | macos-latest | nothing, just proves the Xcode project compiles |
 
 - Builds run on GitHub Actions, so contributors don't need the Android SDK or a Mac.
+- Steps both Android jobs need (test signing key, signing fingerprint) live once in `.github/actions/`. Change them
+  there, not by copying a step into a job.
+- A failure that says "Could not resolve" or "Could not GET" is a download problem, not the change: re-run it before
+  debugging.
 - **When a build fails:** the "Report the Gradle error" step turns the key lines of the Gradle log into
   annotations, so a failure can be diagnosed from the PR page or the public API without the full log. Fix it on the same branch, push, and the PR re-runs.
 
