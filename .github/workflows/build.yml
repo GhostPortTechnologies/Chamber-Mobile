@@ -70,8 +70,10 @@ jobs:
         if: success()
         shell: bash
         run: |
-          APK=$(ls android/app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
-          FP=$(keytool -printcert -jarfile "$APK" 2>/dev/null | grep -m1 "SHA256:" | sed 's/.*SHA256: *//')
+          # apksigner reads the v2/v3 signature (keytool only reads old v1 JAR signatures). Never fails the job.
+          APK=$(ls android/app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1) || true
+          SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1) || true
+          FP=$("$SIGNER" verify --print-certs "$APK" 2>/dev/null | grep -m1 "SHA-256 digest" | sed 's/.*: *//') || true
           echo "::notice::APK signing SHA-256: ${FP:-unknown}"
       - name: Report the Gradle error
         if: failure()
@@ -79,7 +81,7 @@ jobs:
         shell: bash
         run: |
           # Turn the important lines into annotations, which show on the PR and through the public API.
-          grep -E -A12 "What went wrong|^e: |error:| FAILED|Could not|FAILURE" gradle-build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
+          grep -E -A12 "What went wrong|^e: |error:| FAILED|Could not|FAILURE" gradle-build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done || true
       # No artifact: on a public repo anyone signed in to GitHub could download it. A draft release is private.
       # One per branch, replaced on every build. Skipped for PRs from forks, which get a read-only token.
       - name: Save the private test build (draft release)
@@ -139,13 +141,15 @@ jobs:
       - name: Signing fingerprint (to check the CI key is the expected one)
         if: success()
         run: |
-          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
-          FP=$(keytool -printcert -jarfile "$APK" 2>/dev/null | grep -m1 "SHA256:" | sed 's/.*SHA256: *//')
+          # apksigner reads the v2/v3 signature (keytool only reads old v1 JAR signatures). Never fails the job.
+          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1) || true
+          SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1) || true
+          FP=$("$SIGNER" verify --print-certs "$APK" 2>/dev/null | grep -m1 "SHA-256 digest" | sed 's/.*: *//') || true
           echo "::notice::APK signing SHA-256: ${FP:-unknown}"
       - name: Report the Gradle error
         if: failure()
         run: |
-          grep -E -A12 "What went wrong|^e: |error:| FAILED" build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
+          grep -E -A12 "What went wrong|^e: |error:| FAILED" build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done || true
       - name: Save the private test build (draft release)
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
