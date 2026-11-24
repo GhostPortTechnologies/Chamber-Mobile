@@ -83,6 +83,9 @@ class AppState(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(busy = false, error = (e as? ChamberException)?.message ?: "Something went wrong. Try again.") }
     }
 
+    /** Show a message from the phone itself (e.g. why a confirmation didn't happen). */
+    fun say(message: String) = _ui.update { it.copy(error = message, busy = false) }
+
     fun dismissError() = _ui.update { it.copy(error = null, notice = null) }
 
     // ── Signing in ──────────────────────────────────────────────────────────────────────────────

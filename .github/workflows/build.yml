@@ -66,6 +66,13 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug 2>&1 | tee gradle-build.log
+      - name: Signing fingerprint (to check the CI key is the expected one)
+        if: success()
+        shell: bash
+        run: |
+          APK=$(ls android/app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          FP=$(keytool -printcert -jarfile "$APK" 2>/dev/null | grep -m1 "SHA256:" | sed 's/.*SHA256: *//')
+          echo "::notice::APK signing SHA-256: ${FP:-unknown}"
       - name: Report the Gradle error
         if: failure()
         working-directory: android
@@ -129,6 +136,12 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug 2>&1 | tee build.log
+      - name: Signing fingerprint (to check the CI key is the expected one)
+        if: success()
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          FP=$(keytool -printcert -jarfile "$APK" 2>/dev/null | grep -m1 "SHA256:" | sed 's/.*SHA256: *//')
+          echo "::notice::APK signing SHA-256: ${FP:-unknown}"
       - name: Report the Gradle error
         if: failure()
         run: |

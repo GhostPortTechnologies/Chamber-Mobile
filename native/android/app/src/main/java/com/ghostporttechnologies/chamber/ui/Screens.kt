@@ -152,13 +152,13 @@ fun LockedScreen(me: String, busy: Boolean, error: String?, onUnlock: (String) -
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoomsScreen(me: String, rooms: Map<String, Room>, error: String?, onOpen: (String) -> Unit, onLock: () -> Unit, onSignOut: () -> Unit) {
+fun RoomsScreen(me: String, rooms: Map<String, Room>, error: String?, bottom: @Composable () -> Unit, onOpen: (String) -> Unit, onLock: () -> Unit, onSignOut: () -> Unit) {
     Scaffold(topBar = {
         TopAppBar(title = { Brand() }, actions = {
             TextButton(onClick = onLock) { Text("Lock") }
             TextButton(onClick = onSignOut) { Text("Sign out") }
         })
-    }) { padding ->
+    }, bottomBar = bottom) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
             item {
                 Text("Signed in as $me", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
