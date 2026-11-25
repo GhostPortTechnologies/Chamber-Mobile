@@ -24,7 +24,8 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 - Builds run on GitHub Actions, so contributors don't need the Android SDK or a Mac.
 - Steps both Android jobs need (test signing key, signing fingerprint, the draft release) live once in
   `.github/actions/`. Change them there, not by copying a step into a job. The draft-release step posts gh's error as
-  annotations, so a failed upload can be read without signing in.
+  annotations, so a failed upload can be read without signing in. Each APK's file name ends with its commit
+  (`chamber-native-feat-native-android-12a14d5.apk`): install the newest one, which the release notes name.
 - A failure that says "Could not resolve" or "Could not GET" is a download problem, not the change: re-run it before
   debugging.
 - **When a build fails:** the "Report the Gradle error" step turns the key lines of the Gradle log into
@@ -85,3 +86,4 @@ different app. Uninstall the test build first.
 | 2026-11-22 | `allowBackup` was left on, so Android could copy the sign-in to cloud backup | Backup and device transfer are off |
 | 2026-11-22 | A new test APK wouldn't install over the old one: every CI build had its own random debug key | One stable test key from GitHub secrets, and versionCode = CI run number |
 | 2026-11-21 | Tapping the Actions artifact on a phone did nothing (zip, sign-in only) | CI also publishes each branch's APK as a `test-<branch>` pre-release, a direct link |
+| 2026-11-25 | Both test-build uploads failed: GitHub answered HTTP 500 when `--clobber` deleted the old APK, and the step's log needed a sign-in | Shared draft-release step posts gh's errors as annotations; each APK has the commit in its name, so no delete has to succeed |
