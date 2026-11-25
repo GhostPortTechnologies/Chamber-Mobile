@@ -75,26 +75,12 @@ jobs:
       # One per branch, replaced on every build. Skipped for PRs from forks, which get a read-only token.
       - name: Save the private test build (draft release)
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ github.head_ref || github.ref_name }}
-        shell: bash
-        run: |
-          TAG="test-$(echo "$BRANCH" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
-          APK="chamber-${TAG}.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
-          NOTES="Test build of branch ${BRANCH} (commit ${GITHUB_SHA::7}). Debug build for testing only, not for the store. Install: tap ${APK} below. See docs/SOP.md section 3."
-          if DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
-            if [ "$DRAFT" != "true" ]; then
-              echo "::warning::$TAG is already public, so this build was not uploaded to it."
-              exit 0
-            fi
-            gh release edit "$TAG" --notes "$NOTES"
-            gh release upload "$TAG" "$APK" --clobber
-          else
-            gh release create "$TAG" "$APK" --draft --prerelease --target "$GITHUB_SHA" --title "Test build: ${BRANCH}" --notes "$NOTES"
-          fi
-          echo "::notice::Private test build saved as a draft. Signed in to GitHub, open https://github.com/${GITHUB_REPOSITORY}/releases and tap ${APK}"
+        uses: ./.github/actions/draft-release
+        with:
+          prefix: test
+          apk: android/app/build/outputs/apk/debug/app-debug.apk
+          title: "Test build: ${{ github.head_ref || github.ref_name }}"
+          notes: "Test build of branch ${{ github.head_ref || github.ref_name }} (commit ${{ github.sha }}). Debug build for testing only, not for the store. Install: tap the .apk below. See docs/SOP.md section 3."
 
   native-android:
     name: Native Android (Kotlin, T-0358)
@@ -141,22 +127,12 @@ jobs:
           grep -E -A12 "What went wrong|^e: |error:| FAILED" build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done || true
       - name: Save the private test build (draft release)
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ github.head_ref || github.ref_name }}
-        run: |
-          TAG="native-$(echo "$BRANCH" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
-          APK="chamber-${TAG}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "$APK"
-          NOTES="Native app test build of ${BRANCH} (commit ${GITHUB_SHA::7}). Installs as 'Chamber' (dev) next to the current app. Testing only."
-          if DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
-            [ "$DRAFT" = "true" ] || { echo "::warning::$TAG is public, so this build was not uploaded."; exit 0; }
-            gh release edit "$TAG" --notes "$NOTES"
-            gh release upload "$TAG" "$APK" --clobber
-          else
-            gh release create "$TAG" "$APK" --draft --prerelease --target "$GITHUB_SHA" --title "Native test build: ${BRANCH}" --notes "$NOTES"
-          fi
-          echo "::notice::Private native test build saved as draft release $TAG"
+        uses: ./.github/actions/draft-release
+        with:
+          prefix: native
+          apk: native/android/app/build/outputs/apk/debug/app-debug.apk
+          title: "Native test build: ${{ github.head_ref || github.ref_name }}"
+          notes: "Native app test build of ${{ github.head_ref || github.ref_name }} (commit ${{ github.sha }}). Installs as 'Chamber' (dev) next to the current app. Testing only."
 
   ios:
     name: iOS (simulator build, unsigned)

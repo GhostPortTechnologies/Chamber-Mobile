@@ -1,0 +1,45 @@
+name: Private test build (draft release)
+description: Puts the APK in a draft release, one per branch, replaced on every build. Drafts are visible only to people who can push to the repo. A failure is posted as annotations, which show without signing in.
+inputs:
+  prefix:
+    description: tag prefix, e.g. test or native
+    required: true
+  apk:
+    description: path of the built APK
+    required: true
+  title:
+    description: release title
+    required: true
+  notes:
+    description: release notes
+    required: true
+  token:
+    description: token with contents:write
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PREFIX: ${{ inputs.prefix }}
+        SRC_APK: ${{ inputs.apk }}
+        TITLE: ${{ inputs.title }}
+        NOTES: ${{ inputs.notes }}
+        BRANCH: ${{ github.head_ref || github.ref_name }}
+      run: |
+        set -euo pipefail
+        ERR="$RUNNER_TEMP/release-$PREFIX.err"; : > "$ERR"
+        report() { echo "::error::Saving the draft release failed. What gh said:"; tail -20 "$ERR" | sed 's/^/::error::/'; }
+        trap report ERR
+        TAG="$PREFIX-$(echo "$BRANCH" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
+        NAME="chamber-$TAG.apk"
+        cp "$SRC_APK" "$NAME"
+        if DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>>"$ERR"); then
+          if [ "$DRAFT" != "true" ]; then echo "::warning::$TAG is already public, so this build was not uploaded to it."; exit 0; fi
+          gh release edit "$TAG" --notes "$NOTES" 2>>"$ERR"
+          gh release upload "$TAG" "$NAME" --clobber 2>>"$ERR"
+        else
+          gh release create "$TAG" "$NAME" --draft --prerelease --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES" 2>>"$ERR"
+        fi
+        echo "::notice::Private test build saved as draft release $TAG (commit ${GITHUB_SHA::7}). Signed in to GitHub, open https://github.com/$GITHUB_REPOSITORY/releases and tap $NAME"

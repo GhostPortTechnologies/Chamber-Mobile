@@ -22,8 +22,9 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
 | iOS (simulator build, unsigned) | macos-latest | nothing, just proves the Xcode project compiles |
 
 - Builds run on GitHub Actions, so contributors don't need the Android SDK or a Mac.
-- Steps both Android jobs need (test signing key, signing fingerprint) live once in `.github/actions/`. Change them
-  there, not by copying a step into a job.
+- Steps both Android jobs need (test signing key, signing fingerprint, the draft release) live once in
+  `.github/actions/`. Change them there, not by copying a step into a job. The draft-release step posts gh's error as
+  annotations, so a failed upload can be read without signing in.
 - A failure that says "Could not resolve" or "Could not GET" is a download problem, not the change: re-run it before
   debugging.
 - **When a build fails:** the "Report the Gradle error" step turns the key lines of the Gradle log into
