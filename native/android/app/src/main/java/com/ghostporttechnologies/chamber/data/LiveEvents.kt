@@ -37,10 +37,12 @@ class SseParser {
 }
 
 /**
- * Chamber's live "something changed" stream. It reconnects by itself (Chamber restarts during releases), and
- * the screens fetch what changed, so nothing is read from the stream except which room to refresh.
+ * Chamber's live "something changed" stream. It reconnects by itself (Chamber restarts during releases, phones lose
+ * signal), and the screens fetch what changed, so nothing is read from the stream except which room to refresh.
+ * [online] hears true on every (re)connect and false when Chamber can't be reached, so the app can say it's offline
+ * and catch up on what changed meanwhile.
  */
-fun ChamberApi.changes(): Flow<ChangeEvent> = flow {
+fun ChamberApi.changes(online: (Boolean) -> Unit = {}): Flow<ChangeEvent> = flow {
     var wait = 1_000L
     while (true) {
         try {
@@ -48,8 +50,10 @@ fun ChamberApi.changes(): Flow<ChangeEvent> = flow {
                 .newCall(request("/api/events").header("Accept", "text/event-stream").build()).execute().use { response ->
                     if (response.code == 401) throw ChamberException(401, "You're signed out. Sign in again.")
                     if (response.code == 423) throw ChamberException(423, "Chamber is locked on this phone.", locked = true)
+                    if (!response.isSuccessful) { online(false); return@use } // e.g. 502 while Chamber restarts: back off, don't spin
                     val source = response.body?.source() ?: return@use
                     wait = 1_000L
+                    online(true)
                     val parser = SseParser()
                     while (true) {
                         val line = source.readUtf8Line() ?: break
@@ -60,7 +64,7 @@ fun ChamberApi.changes(): Flow<ChangeEvent> = flow {
                     }
                 }
         } catch (e: IOException) {
-            // Dropped connection or a restart: try again below.
+            online(false) // dropped connection, no signal, or a restart: try again below
         }
         delay(wait)
         wait = (wait * 2).coerceAtMost(30_000L)

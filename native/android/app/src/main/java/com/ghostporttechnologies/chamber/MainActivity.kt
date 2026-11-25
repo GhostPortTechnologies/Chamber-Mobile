@@ -16,6 +16,7 @@ import com.ghostporttechnologies.chamber.drive.DriveRules
 import com.ghostporttechnologies.chamber.ui.DrivingHold
 import com.ghostporttechnologies.chamber.ui.DrivingOffScreen
 import com.ghostporttechnologies.chamber.ui.DrivingPausedBanner
+import com.ghostporttechnologies.chamber.ui.OfflineBanner
 import com.ghostporttechnologies.chamber.ui.SettingsScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -118,6 +119,7 @@ class MainActivity : FragmentActivity() {
                     }
                     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                     if (signedIn && pausedInVehicle) DrivingPausedBanner()
+                    if (signedIn && ui.offline && !driving) OfflineBanner()
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         // Driving mode (T-0321) covers everything once signed in, the screen lock's password box included.
                         if (signedIn && driving) {

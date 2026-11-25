@@ -49,6 +49,8 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
    - [ ] Driving mode (native app): Settings > "I'm driving now" shows the hold screen at once, with nothing to read
          or tap; a push meanwhile shows nothing; "I'm not driving" asks for a fingerprint and then the app is back with
          the "paused for this trip" line; "Turn off driving mode" is refused while the phone says you're in a vehicle
+   - [ ] Weak signal (native app): in airplane mode, type a message and tap Send; the text stays in the box and the
+         "No connection" line shows; back online, the line goes, new messages from meanwhile appear, and Send works
    - [ ] Anything the PR itself adds (push, biometrics…)
 4. Report the result in the PR or in #general. Merge only after the checks pass.
 

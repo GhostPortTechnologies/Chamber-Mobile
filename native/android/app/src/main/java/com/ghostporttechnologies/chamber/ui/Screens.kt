@@ -180,7 +180,7 @@ fun RoomsScreen(me: String, rooms: Map<String, Room>, error: String?, bottom: @C
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(room: String, title: String, chat: ChatState, error: String?, onBack: () -> Unit, onSend: (String) -> Unit) {
+fun ChatScreen(room: String, title: String, chat: ChatState, error: String?, onBack: () -> Unit, onSend: (String, () -> Unit) -> Unit) {
     var draft by rememberSaveable(room) { mutableStateOf("") }
     val list = rememberLazyListState()
     LaunchedEffect(chat.messages.size) { if (chat.messages.isNotEmpty()) list.animateScrollToItem(chat.messages.size - 1) }
@@ -202,10 +202,11 @@ fun ChatScreen(room: String, title: String, chat: ChatState, error: String?, onB
                     modifier = Modifier.weight(1f), maxLines = 5,
                 )
                 Button(
-                    onClick = { onSend(draft); draft = "" },
+                    // The box empties only once Chamber has the message; if sending fails, the text stays to try again.
+                    onClick = { val text = draft; onSend(text) { if (draft == text) draft = "" } },
                     enabled = draft.isNotBlank() && !chat.sending,
                     modifier = Modifier.padding(start = 8.dp).height(56.dp),
-                ) { Text("Send") }
+                ) { Text(if (chat.sending) "Sending…" else "Send") }
             }
         }
     }

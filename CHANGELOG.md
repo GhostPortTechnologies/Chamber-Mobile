@@ -16,6 +16,9 @@
   and a new trip starts, or 12 hours. Turning it off completely is in Settings only, behind a plain warning, a tick
   and fingerprint or PIN, and is refused while the phone says you're in a vehicle. Settings is new (sign out moved
   there). Not yet: telling agents you're driving (needs the server), a spoken alert, Android Auto.
+- Weak signal: a message that fails to send stays in the box to try again (it used to be cleared at once and lost).
+  A line says when Chamber can't be reached, and after reconnecting the app reloads what changed meanwhile, which
+  the live stream never announced. A 502 while Chamber restarts now backs off instead of reconnecting every second.
 
 ## Unreleased: PR #2, Android push (compiled and unit tested only, not tried on a real phone)
 

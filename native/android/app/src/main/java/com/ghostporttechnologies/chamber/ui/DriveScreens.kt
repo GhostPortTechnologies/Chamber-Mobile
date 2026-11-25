@@ -75,6 +75,18 @@ fun DrivingPausedBanner() {
     }
 }
 
+/** No signal, or Chamber is restarting: say so, instead of letting old messages look current. */
+@Composable
+fun OfflineBanner() {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "No connection to Chamber. Showing what was loaded last; it reconnects by itself.",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
 private fun day(ms: Long) = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ms))
 
 /** The only place for switches (CHAMBER-MOBILE-SOP). */

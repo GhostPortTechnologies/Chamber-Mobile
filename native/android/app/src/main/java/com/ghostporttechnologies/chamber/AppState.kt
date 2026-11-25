@@ -61,6 +61,8 @@ data class UiState(
     val notice: String? = null,
     val busy: Boolean = false,
     val error: String? = null,
+    /** Chamber can't be reached right now: the screens show what was loaded last. */
+    val offline: Boolean = false,
 )
 
 class AppState(app: Application) : AndroidViewModel(app) {
@@ -186,9 +188,14 @@ class AppState(app: Application) : AndroidViewModel(app) {
 
     private fun listen() {
         live?.cancel()
+        var connects = 0
         live = viewModelScope.launch {
             try {
-                api.changes().collect { change ->
+                api.changes(online = { ok ->
+                    _ui.update { if (it.offline == !ok) it else it.copy(offline = !ok) }
+                    // Back after a gap (no signal, a Chamber restart): what changed meanwhile was never announced.
+                    if (ok && connects++ > 0) viewModelScope.launch { catchUp() }
+                }).collect { change ->
                     when (change.kind) {
                         "rooms" -> refreshRooms()
                         "tickets", "reviews" -> if (_ui.value.screen.let { it is Screen.Tickets || it is Screen.TicketOpen }) refreshTickets()
@@ -199,6 +206,17 @@ class AppState(app: Application) : AndroidViewModel(app) {
             } catch (e: ChamberException) {
                 fail(e)
             }
+        }
+    }
+
+    /** Reload what the current screen shows, plus the waiting-questions count. Failures stay quiet: the next change retries. */
+    private suspend fun catchUp() {
+        refreshRooms()
+        runCatching { refreshAsks() }
+        when (val s = _ui.value.screen) {
+            is Screen.Chat -> runCatching { refreshChat(s.room) }
+            Screen.Tickets, is Screen.TicketOpen -> runCatching { refreshTickets() }
+            else -> Unit
         }
     }
 
@@ -323,13 +341,15 @@ class AppState(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun send(text: String) {
+    /** [sent] runs only once Chamber has the message, so a weak signal never throws away what was typed. */
+    fun send(text: String, sent: () -> Unit) {
         val room = (_ui.value.screen as? Screen.Chat)?.room ?: return
         if (text.isBlank()) return
-        _ui.update { it.copy(chat = it.chat.copy(sending = true)) }
+        _ui.update { it.copy(chat = it.chat.copy(sending = true), error = null) }
         viewModelScope.launch {
             try {
                 api.send(room, text)
+                sent()
                 refreshChat(room)
             } catch (e: Throwable) {
                 fail(e)
