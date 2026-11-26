@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import com.ghostporttechnologies.chamber.data.TicketQueue
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -68,7 +70,6 @@ fun Notice(notice: String?) {
     if (notice != null) Text(notice, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 }
 
-private val STATUS_ORDER = listOf("proposed", "approved", "in_progress", "done", "rejected")
 private fun statusLabel(s: String) = when (s) {
     "proposed" -> "Waiting for approval"
     "approved" -> "Approved"
@@ -81,33 +82,62 @@ private fun statusLabel(s: String) = when (s) {
 /** A list to read and open. There are deliberately no approve buttons here: decisions happen inside a ticket. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TicketsScreen(tickets: List<Ticket>, error: String?, notice: String?, bottom: @Composable () -> Unit, onOpen: (String) -> Unit) {
-    var showDone by remember { mutableStateOf(false) }
+fun TicketsScreen(
+    tickets: List<Ticket>, error: String?, notice: String?, showDone: Boolean, onShowDone: (Boolean) -> Unit,
+    bottom: @Composable () -> Unit, onOpen: (String) -> Unit,
+) {
+    val queue = remember(tickets) { TicketQueue.arrange(tickets) }
+    val now = System.currentTimeMillis()
     Scaffold(topBar = { TopAppBar(title = { Text("Tickets") }) }, bottomBar = bottom) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
             item { ErrorLine(error); Notice(notice) }
-            STATUS_ORDER.filter { showDone || (it != "done" && it != "rejected") }.forEach { status ->
-                val group = tickets.filter { it.status == status }.sortedByDescending { it.id }
-                if (group.isNotEmpty()) {
-                    item(key = "h-$status") {
-                        Text("${statusLabel(status)} · ${group.size}", style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp))
-                    }
-                    items(group, key = { it.id }) { t ->
-                        Column(Modifier.fillMaxWidth().clickable { onOpen(t.id) }.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text(t.id, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
-                            Text(t.title)
-                            Text(listOfNotNull(t.priority, if (t.doneBy == "human") "for a person" else if (t.doneBy == "agent") "for an agent" else null, t.assignee).joinToString(" · "),
-                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                    }
-                }
-            }
+            // T-0318: decisions first, in the order that unblocks the most; approving happens inside the ticket, one at a time.
+            section("decide", "Needs your decision", queue.decide, now, onOpen,
+                hint = "An agent waiting to start comes first, then priority, then what has waited longest. Open one to approve it or send it back.",
+                empty = "Nothing waits for your approval.")
+            section("todo", "Your to-dos", queue.todo, now, onOpen, hint = "Approved steps only a person can do.")
+            section("agents", "Agents' work", queue.agents, now, onOpen)
+            if (showDone) section("closed", "Done and not going ahead", queue.closed, now, onOpen)
             item {
-                TextButton(onClick = { showDone = !showDone }, modifier = Modifier.padding(8.dp)) { Text(if (showDone) "Hide done and rejected" else "Show done and rejected") }
+                TextButton(onClick = { onShowDone(!showDone) }, modifier = Modifier.padding(8.dp)) { Text(if (showDone) "Hide done and rejected" else "Show done and rejected") }
             }
         }
+    }
+}
+
+private fun LazyListScope.section(
+    key: String, title: String, group: List<Ticket>, now: Long, onOpen: (String) -> Unit, hint: String? = null, empty: String? = null,
+) {
+    if (group.isEmpty() && empty == null) return
+    item(key = "h-$key") {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
+            Text("$title · ${group.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (group.isEmpty()) Text(empty.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+            else if (hint != null) Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    items(group, key = { "$key-${it.id}" }) { t ->
+        Column(Modifier.fillMaxWidth().clickable { onOpen(t.id) }.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(t.id, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                val urgent = TicketQueue.rank(t.priority) <= 1
+                Text(t.priority, style = MaterialTheme.typography.labelMedium,
+                    color = if (urgent) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                TicketQueue.waited(t.proposedAt, now)?.takeIf { t.status == "proposed" }?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Text(AskRules.visible(t.title, 200))
+            TicketQueue.summary(t.body).takeIf { it.isNotEmpty() }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
+            Text(listOfNotNull(
+                when (t.doneBy) { "human" -> "for you to do"; "agent" -> "an agent does it"; else -> null },
+                t.assignee?.let { "worked by $it" },
+                if (t.status == "proposed") "from ${t.proposedBy}" else statusLabel(t.status),
+            ).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
 }
 

@@ -48,6 +48,8 @@ data class TicketView(
     val changeChecked: Boolean = false,
 )
 
+private val OPEN_TICKETS = listOf("proposed", "approved", "in_progress")
+
 data class UiState(
     val screen: Screen = Screen.Starting,
     val me: String = "",
@@ -63,6 +65,8 @@ data class UiState(
     val error: String? = null,
     /** Chamber can't be reached right now: the screens show what was loaded last. */
     val offline: Boolean = false,
+    /** Done and rejected tickets are fetched only once the person asks to see them (T-0318). */
+    val closedShown: Boolean = false,
 )
 
 class AppState(app: Application) : AndroidViewModel(app) {
@@ -261,11 +265,17 @@ class AppState(app: Application) : AndroidViewModel(app) {
     // ── Tickets: decisions only inside an opened ticket (CHAMBER-MOBILE-SOP §4) ─────────────────
 
     private suspend fun refreshTickets() {
-        val tickets = api.tickets()
+        // Open tickets only, unless the person asked for the closed ones too: a fraction of the whole list.
+        val tickets = if (_ui.value.closedShown) api.tickets() else OPEN_TICKETS.flatMap { api.tickets(it) }
         _ui.update { st ->
             val open = st.open.ticket?.let { cur -> tickets.firstOrNull { it.id == cur.id } }
             st.copy(tickets = tickets, open = if (open != null) st.open.copy(ticket = open) else st.open)
         }
+    }
+
+    fun showClosed(show: Boolean) {
+        _ui.update { it.copy(closedShown = show) }
+        if (show) work { refreshTickets() }
     }
 
     fun openTicket(id: String) {

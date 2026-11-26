@@ -58,6 +58,8 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
          wakes the phone (held while driving); after signing out, nothing more arrives. On a phone with both, switching
          to UnifiedPush and back works and nothing arrives twice. If alerts stop after a burst of them, note how many
          and when: it may be ntfy.sh's rate limit
+   - [ ] Tickets queue (native app, T-0318): "Needs your decision" is on top with the oldest high-priority item
+         first, each with "waiting N days"; your to-dos are a separate list; "Show done and rejected" loads them
    - [ ] Anything the PR itself adds (push, biometrics…)
 4. Report the result in the PR or in #general. Merge only after the checks pass.
 

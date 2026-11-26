@@ -26,6 +26,11 @@
   Notifications shows the route, offers the choice on a phone with both, says which push servers the workspace
   allows when Chamber refuses one, and has "Send a test notification". UnifiedPush connector 3.3.6. Built and unit
   tested in CI, not yet tried on a phone.
+- Tickets as a queue (T-0318): "Needs your decision" comes first, ordered so an agent waiting to start is first,
+  then priority, then whatever has waited longest; each card shows how long it has waited and the first line of what
+  it asks. "Your to-dos" (approved steps for a person) and "Agents' work" are kept apart. Approving still happens
+  only inside an opened ticket, one at a time (no batch approve: team rule). The tab fetches only open tickets
+  (about 60 of ~400 today; the full list is over 1 MB) and fetches done and rejected ones only when asked.
 
 ## Unreleased: PR #2, Android push (compiled and unit tested only, not tried on a real phone)
 

@@ -166,7 +166,7 @@ class MainActivity : FragmentActivity() {
                                     }
                                 }
                             }
-                            Screen.Tickets -> TicketsScreen(ui.tickets, ui.error, ui.notice, { tabs(Tab.Tickets) }, state::openTicket)
+                            Screen.Tickets -> TicketsScreen(ui.tickets, ui.error, ui.notice, ui.closedShown, state::showClosed, { tabs(Tab.Tickets) }, state::openTicket)
                             is Screen.TicketOpen -> {
                                 BackHandler(onBack = state::back)
                                 TicketScreen(ui.open, ui.busy, ui.error, ui.notice, state::back,

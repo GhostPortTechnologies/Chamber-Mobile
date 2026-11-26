@@ -105,7 +105,13 @@ class ChamberApi(private val tokens: () -> String?) {
 
     // ── Tickets ─────────────────────────────────────────────────────────────────────────────────
 
-    suspend fun tickets(): List<Ticket> = decode<TicketsReply>(call("/api/tickets")).tickets
+    /** Every ticket, or only those with [status]: the whole list is over a megabyte, so the phone asks for less. */
+    suspend fun tickets(status: String? = null): List<Ticket> {
+        val url = (CHAMBER_ORIGIN + "/api/tickets").toHttpUrl().newBuilder()
+            .apply { if (status != null) addQueryParameter("status", status) }
+            .build()
+        return decode<TicketsReply>(call(url.encodedPath + (url.encodedQuery?.let { "?$it" } ?: ""))).tickets
+    }
 
     /** The change on a ticket, or null when it carries none (404). */
     suspend fun diff(id: String): DiffReply? = try {
