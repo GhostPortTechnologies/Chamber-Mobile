@@ -53,6 +53,11 @@ Every pull request and every push to `main` runs `.github/workflows/build.yml`:
          the "paused for this trip" line; "Turn off driving mode" is refused while the phone says you're in a vehicle
    - [ ] Weak signal (native app): in airplane mode, type a message and tap Send; the text stays in the box and the
          "No connection" line shows; back online, the line goes, new messages from meanwhile appear, and Send works
+   - [ ] Alerts without Google (native app, T-0388): on GrapheneOS with ntfy from F-Droid and no Google Play, Settings >
+         Notifications says "UnifiedPush (ntfy)"; "Send a test notification" shows the test; an agent's question
+         wakes the phone (held while driving); after signing out, nothing more arrives. On a phone with both, switching
+         to UnifiedPush and back works and nothing arrives twice. If alerts stop after a burst of them, note how many
+         and when: it may be ntfy.sh's rate limit
    - [ ] Anything the PR itself adds (push, biometrics…)
 4. Report the result in the PR or in #general. Merge only after the checks pass.
 

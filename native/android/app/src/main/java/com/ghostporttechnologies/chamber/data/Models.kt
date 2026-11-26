@@ -2,6 +2,7 @@ package com.ghostporttechnologies.chamber.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
 
 /** Only the fields the app uses; Chamber can add more without breaking the app. */
@@ -121,3 +122,15 @@ data class AsksReply(val asks: List<Ask> = emptyList())
 
 @Serializable
 data class PushTest(val test: Boolean = false, val nonce: String = "")
+
+/** GET /account/push: Chamber's VAPID public key, which some UnifiedPush distributors require (T-0388). */
+@Serializable
+data class PushInfo(val publicKey: String = "")
+
+/** POST /account/push. [id] is whatever Chamber uses, kept only to remove this phone's entry later. */
+@Serializable
+data class PushRegistered(val ok: Boolean = false, val id: JsonElement? = null, val via: String = "")
+
+/** POST /account/push/test: "ok", "gone", "error" or "held", with the push server's reason. */
+@Serializable
+data class PushTestSent(val pushService: String = "", val why: String = "", val nonce: String = "", val via: String = "")

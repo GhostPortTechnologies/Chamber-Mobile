@@ -3,6 +3,8 @@ package com.ghostporttechnologies.chamber.data
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -26,6 +28,8 @@ class ChamberException(
     val locked: Boolean = false,
     /** The server wants the password again before this action (T-0241 re-check). */
     val recheck: Boolean = false,
+    /** A 403 on a push address: the push servers the workspace allows (T-0388). */
+    val allowed: List<String> = emptyList(),
 ) : Exception(message) {
     val signedOut get() = status == 401
 }
@@ -58,7 +62,11 @@ class ChamberApi(private val tokens: () -> String?) {
         try {
             http.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (response.isSuccessful) text else throw ChamberException(response.code, errorText(response.code, text), isLocked(response.code, text), flag(response.code == 403, text, "recheckRequired"))
+                if (response.isSuccessful) text else throw ChamberException(
+                    response.code, errorText(response.code, text), isLocked(response.code, text),
+                    flag(response.code == 403, text, "recheckRequired"),
+                    if (response.code == 403) strings(text, "allowed") else emptyList(),
+                )
             }
         } catch (e: IOException) {
             throw ChamberException(0, "Can't reach Chamber. Check your connection and try again.")
@@ -135,7 +143,7 @@ class ChamberApi(private val tokens: () -> String?) {
     // ── Push (T-0355): Chamber only learns this phone's push token. Pushes carry no content. ───────
 
     /** 503 means the server has no Firebase key yet; the app just tries again later. */
-    suspend fun registerPush(token: String, name: String) {
+    suspend fun registerPush(token: String, name: String): PushRegistered = registered(
         call("/account/push", buildJsonObject {
             put("device", buildJsonObject {
                 put("platform", "android")
@@ -143,7 +151,43 @@ class ChamberApi(private val tokens: () -> String?) {
                 put("token", token)
                 put("name", name)
             })
-        })
+        }),
+    )
+
+    /** Chamber's VAPID public key, for registering with a UnifiedPush distributor (T-0388). */
+    suspend fun pushInfo(): PushInfo = decode(call("/account/push"))
+
+    /**
+     * A UnifiedPush address (T-0388) and this phone's Web Push keys. Chamber encrypts every wake-up to these keys,
+     * so the push server only sees ciphertext. A 403 carries the push servers the workspace allows.
+     */
+    suspend fun registerUnifiedPush(endpoint: String, p256dh: String, auth: String, name: String): PushRegistered = registered(
+        call("/account/push", buildJsonObject {
+            put("device", buildJsonObject {
+                put("platform", "android")
+                put("provider", "unifiedpush")
+                put("endpoint", endpoint)
+                put("keys", buildJsonObject {
+                    put("p256dh", p256dh)
+                    put("auth", auth)
+                })
+                put("name", name)
+            })
+        }),
+    )
+
+    /** A 200 is a success whatever its body says; the id and name are extras. */
+    private fun registered(text: String): PushRegistered =
+        runCatching { decode<PushRegistered>(text) }.getOrDefault(PushRegistered(ok = true))
+
+    /** Chamber sends a test wake-up to this address now; the phone shows it like any other test. */
+    suspend fun sendPushTest(endpoint: String): PushTestSent = decode(
+        call("/account/push/test", buildJsonObject { put("device", buildJsonObject { put("endpoint", endpoint) }) }),
+    )
+
+    /** Removes one of this account's push entries (the id from registering). */
+    suspend fun removePush(id: JsonElement) {
+        call("/account/push/remove", buildJsonObject { put("id", id) })
     }
 
     /** Settings > Notifications > Send a test: is this push that test? */
@@ -188,6 +232,11 @@ class ChamberApi(private val tokens: () -> String?) {
             "android; " + listOf(Build.MANUFACTURER, Build.MODEL)
                 .filter { !it.isNullOrBlank() }.joinToString(" ").replace(Regex("[^\\x20-\\x7E]"), "").take(40)
         }
+
+        fun strings(body: String, name: String): List<String> = runCatching {
+            (ChamberJson.parseToJsonElement(body).jsonObject[name] as? JsonArray)
+                ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+        }.getOrDefault(emptyList())
 
         fun isLocked(status: Int, body: String): Boolean = flag(status == 423, body, "sessionLocked")
 

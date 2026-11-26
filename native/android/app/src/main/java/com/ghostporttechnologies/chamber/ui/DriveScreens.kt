@@ -102,6 +102,7 @@ fun SettingsScreen(
     onTurnOff: () -> Unit,
     onTurnOn: () -> Unit,
     onSignOut: () -> Unit,
+    notifications: @Composable () -> Unit = {},
 ) {
     Scaffold(topBar = {
         TopAppBar(title = { Text("Settings") }, navigationIcon = { TextButton(onClick = onBack) { Text("Back") } })
@@ -148,6 +149,8 @@ fun SettingsScreen(
                     )
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            notifications()
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Text("Account", style = MaterialTheme.typography.titleLarge)
             Text("Signed in as $me", color = MaterialTheme.colorScheme.onSurfaceVariant)

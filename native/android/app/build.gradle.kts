@@ -79,6 +79,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.firebase:firebase-messaging:25.0.1")
     implementation("com.google.android.gms:play-services-location:21.3.0") // activity detection for driving mode (T-0321)
+    implementation("org.unifiedpush.android:connector:3.3.6") // alerts without Google, e.g. through ntfy (T-0388)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     debugImplementation("androidx.compose.ui:ui-tooling")

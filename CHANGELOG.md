@@ -19,6 +19,13 @@
 - Weak signal: a message that fails to send stays in the box to try again (it used to be cleared at once and lost).
   A line says when Chamber can't be reached, and after reconnecting the app reloads what changed meanwhile, which
   the live stream never announced. A 502 while Chamber restarts now backs off instead of reconnecting every second.
+- Alerts without Google (T-0388): on a phone without Google Play (GrapheneOS, for example), alerts come through a
+  UnifiedPush app such as ntfy from F-Droid. The wake-up is encrypted to this phone's keys and says only "wake"; the
+  app then asks Chamber what is waiting, with the same rules as Google's push (driving mode, Allow/Deny only after
+  unlocking, sign-out stops it). A message that didn't decrypt, or says anything else, wakes nothing. Settings >
+  Notifications shows the route, offers the choice on a phone with both, says which push servers the workspace
+  allows when Chamber refuses one, and has "Send a test notification". UnifiedPush connector 3.3.6. Built and unit
+  tested in CI, not yet tried on a phone.
 
 ## Unreleased: PR #2, Android push (compiled and unit tested only, not tried on a real phone)
 

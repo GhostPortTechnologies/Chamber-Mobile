@@ -16,6 +16,7 @@ import com.ghostporttechnologies.chamber.drive.DriveRules
 import com.ghostporttechnologies.chamber.ui.DrivingHold
 import com.ghostporttechnologies.chamber.ui.DrivingOffScreen
 import com.ghostporttechnologies.chamber.ui.DrivingPausedBanner
+import com.ghostporttechnologies.chamber.ui.NotificationSettings
 import com.ghostporttechnologies.chamber.ui.OfflineBanner
 import com.ghostporttechnologies.chamber.ui.SettingsScreen
 import kotlinx.coroutines.delay
@@ -104,6 +105,7 @@ class MainActivity : FragmentActivity() {
                     val ui by state.ui.collectAsStateWithLifecycle()
                     val signedIn = ui.screen !is Screen.SignIn && ui.screen != Screen.Starting
                     val drive by Drive.state.collectAsStateWithLifecycle()
+                    val alerts by Push.status.collectAsStateWithLifecycle()
                     var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
                     LaunchedEffect(Unit) { while (true) { delay(30_000); clock = System.currentTimeMillis() } } // a trip pause runs out by time
                     val now = maxOf(clock, System.currentTimeMillis())
@@ -142,7 +144,16 @@ class MainActivity : FragmentActivity() {
                                     onDrivingNow = { changeDrive(DriveRules::drivingByHand) },
                                     onTurnOff = { state.tab(Screen.DrivingOff) },
                                     onTurnOn = { changeDrive(DriveRules::turnedOn) },
-                                    onSignOut = state::signOut)
+                                    onSignOut = state::signOut,
+                                    notifications = {
+                                        NotificationSettings(alerts,
+                                            onChoose = { Push.choose(this@MainActivity, it) },
+                                            onTest = { Push.sendTest(this@MainActivity) },
+                                            onAndroidSettings = {
+                                                startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+                                            })
+                                    })
                             }
                             Screen.DrivingOff -> {
                                 BackHandler(onBack = state::back)
@@ -202,7 +213,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        Push.start(this) // picks up a permission or token change; does nothing before sign-in
+        Push.start(this) // picks up a permission, token or push-app change; does nothing before sign-in
         Drive.startDetection(this) // does nothing without the permission or Play services
         recheckTick++
     }
