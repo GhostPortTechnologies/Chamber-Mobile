@@ -22,7 +22,8 @@ data class LoginReply(
     val account: Account? = null,
     val mfa: Boolean = false,
     val mfaToken: String? = null,
-    val totp: Boolean = false,
+    /** null when Chamber doesn't say: the code box shows, as on the web page. */
+    val totp: Boolean? = null,
     val passkey: Boolean = false,
     val message: String? = null,
 )

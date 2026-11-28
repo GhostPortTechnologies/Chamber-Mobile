@@ -38,12 +38,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ghostporttechnologies.chamber.ui.ChamberTheme
@@ -57,6 +55,9 @@ import com.ghostporttechnologies.chamber.ui.TicketScreen
 import com.ghostporttechnologies.chamber.ui.TicketsScreen
 import com.ghostporttechnologies.chamber.ui.RoomsScreen
 import com.ghostporttechnologies.chamber.ui.SignInScreen
+import com.ghostporttechnologies.chamber.ui.StartingScreen
+import com.ghostporttechnologies.chamber.ui.CrashDialog
+import androidx.compose.runtime.mutableStateOf
 
 class MainActivity : FragmentActivity() {
 
@@ -106,6 +107,7 @@ class MainActivity : FragmentActivity() {
                     val signedIn = ui.screen !is Screen.SignIn && ui.screen != Screen.Starting
                     val drive by Drive.state.collectAsStateWithLifecycle()
                     val alerts by Push.status.collectAsStateWithLifecycle()
+                    var crash by remember { mutableStateOf(CrashLog.read(this@MainActivity)) }
                     var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
                     LaunchedEffect(Unit) { while (true) { delay(30_000); clock = System.currentTimeMillis() } } // a trip pause runs out by time
                     val now = maxOf(clock, System.currentTimeMillis())
@@ -132,8 +134,9 @@ class MainActivity : FragmentActivity() {
                             })
                         } else {
                         if (ui.recheck) RecheckDialog(ui.busy, ui.error, state::recheck, state::cancelRecheck)
+                        crash?.let { report -> CrashDialog(report) { CrashLog.clear(this@MainActivity); crash = null } }
                         when (val screen = ui.screen) {
-                            Screen.Starting -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                            Screen.Starting -> StartingScreen(ui.busy, ui.error, state::retryStart, state::signOut)
                             is Screen.SignIn -> SignInScreen(screen.hint, ui.busy, ui.error, state::signIn, state::enterCode)
                             Screen.Rooms -> RoomsScreen(ui.me, ui.rooms, ui.error, { tabs(Tab.Chat) }, state::openRoom, state::lockNow) { state.tab(Screen.Settings) }
                             Screen.Settings -> {

@@ -1,6 +1,14 @@
 package com.ghostporttechnologies.chamber.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -117,6 +125,50 @@ fun SignInScreen(codeHint: String?, busy: Boolean, error: String?, onPassword: (
             if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text(if (codeHint == null) "Sign in" else "Continue")
         }
     }
+}
+
+/** Opening Chamber with a saved sign-in: a spinner while it loads, and never only a spinner when it failed. */
+@Composable
+fun StartingScreen(busy: Boolean, error: String?, onRetry: () -> Unit, onSignOut: () -> Unit) {
+    if (error == null || busy) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+        Brand()
+        Spacer(Modifier.height(16.dp))
+        Text("Chamber didn't open.", style = MaterialTheme.typography.titleMedium)
+        ErrorLine(error)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Try again") }
+        TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+    }
+}
+
+/** What made Chamber close last time (CrashLog), to copy and pass on. Nothing is sent by the app. */
+@Composable
+fun CrashDialog(report: String, onDone: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text("Chamber closed unexpectedly") },
+        text = {
+            Column {
+                Text("Last time, Chamber stopped because of a bug. Copy the details and send them to the person who gave you this app.")
+                Text(
+                    report, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp).heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Chamber crash", report))
+                onDone()
+            }) { Text("Copy details") }
+        },
+        dismissButton = { TextButton(onClick = onDone) { Text("Close") } },
+    )
 }
 
 @Composable

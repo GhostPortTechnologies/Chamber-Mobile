@@ -35,6 +35,13 @@ class DataTest {
         assertTrue(reply.mfa); assertEquals("m1", reply.mfaToken); assertNull(reply.token)
     }
 
+    @Test fun aSecondStepThatDoesNotMentionTheCodeStillOffersIt() {
+        // The web page shows the code box unless "totp" is false; the app must not read a missing field as "passkey only".
+        val reply = ChamberJson.decodeFromString<LoginReply>("""{"ok":true,"mfa":true,"mfaToken":"m1"}""")
+        assertNull(reply.totp)
+        assertEquals(false, ChamberJson.decodeFromString<LoginReply>("""{"mfa":true,"mfaToken":"m1","totp":false}""").totp)
+    }
+
     @Test fun loginDoneAndUnknownFieldsIgnored() {
         val reply = ChamberJson.decodeFromString<LoginReply>("""{"ok":true,"token":"t","account":{"username":"a","role":"owner","new":1},"future":[1]}""")
         assertEquals("t", reply.token); assertFalse(reply.mfa); assertEquals("a", reply.account?.username)

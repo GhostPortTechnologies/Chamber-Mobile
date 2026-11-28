@@ -50,6 +50,8 @@ data class TicketView(
 
 private val OPEN_TICKETS = listOf("proposed", "approved", "in_progress")
 
+private val EXPIRED = Regex("expired", RegexOption.IGNORE_CASE)
+
 data class UiState(
     val screen: Screen = Screen.Starting,
     val me: String = "",
@@ -87,10 +89,23 @@ class AppState(app: Application) : AndroidViewModel(app) {
 
     private fun show(screen: Screen) = _ui.update { it.copy(screen = screen, error = null, busy = false) }
 
-    private fun fail(e: Throwable) {
-        if (e is ChamberException && e.signedOut) return signedOut()
+    /** [signingIn]: a 401 from the sign-in itself is a wrong password or code, not "this session ended". */
+    private fun fail(e: Throwable, signingIn: Boolean = false) {
+        if (e is ChamberException && e.signedOut && !signingIn) return signedOut()
         if (e is ChamberException && e.locked) return locked()
-        _ui.update { it.copy(busy = false, error = (e as? ChamberException)?.message ?: "Something went wrong. Try again.") }
+        if (signingIn && e is ChamberException && EXPIRED.containsMatchIn(e.message)) {
+            // The code step timed out: back to the password, as the web page does.
+            _ui.update { it.copy(screen = Screen.SignIn(), busy = false, error = e.message) }
+            return
+        }
+        _ui.update { it.copy(busy = false, error = problem(e)) }
+    }
+
+    /** What to show for a failure. Test builds add what failed, so a screenshot is enough to find it. */
+    private fun problem(e: Throwable): String {
+        if (e is ChamberException) return e.message
+        val detail = if (BuildConfig.DEBUG) "\n(${e.javaClass.simpleName}: ${e.message.orEmpty().take(200)})" else ""
+        return "Something went wrong. Try again.$detail"
     }
 
     /** Show a message from the phone itself (e.g. why a confirmation didn't happen). */
@@ -100,19 +115,21 @@ class AppState(app: Application) : AndroidViewModel(app) {
 
     // ── Signing in ──────────────────────────────────────────────────────────────────────────────
 
-    fun signIn(identity: String, password: String) = work {
+    fun signIn(identity: String, password: String) = work(signingIn = true) {
         finishOrAskForCode(api.login(identity, password))
     }
 
-    fun enterCode(code: String) = work {
+    fun enterCode(code: String) = work(signingIn = true) {
         val mfa = (_ui.value.screen as? Screen.SignIn)?.mfaToken ?: return@work show(Screen.SignIn())
         finishOrAskForCode(api.loginCode(mfa, code))
     }
 
     private fun finishOrAskForCode(reply: LoginReply) {
         when {
-            reply.token != null -> { vault.write(reply.token); start() }
-            reply.mfa && reply.mfaToken != null && reply.totp ->
+            // Signed in: loading the account is "opening Chamber", so a failure there gets Try again / Sign out.
+            reply.token != null -> { vault.write(reply.token); _ui.update { it.copy(screen = Screen.Starting) }; start() }
+            // Like the web page: the code box shows unless Chamber says this account has no authenticator code.
+            reply.mfa && reply.mfaToken != null && reply.totp != false ->
                 show(Screen.SignIn(reply.mfaToken, reply.message ?: "Enter the 6-digit code from your authenticator app, or a recovery code."))
             reply.mfa -> _ui.update {
                 it.copy(busy = false, error = "This account signs in with a passkey only. Passkeys in the app are coming; for now add an authenticator code to your account in Chamber on the web.")
@@ -179,6 +196,9 @@ class AppState(app: Application) : AndroidViewModel(app) {
     }
 
     // ── Rooms and chat ──────────────────────────────────────────────────────────────────────────
+
+    /** "Try again" when opening Chamber failed (no signal, Chamber restarting): the token is kept. */
+    fun retryStart() = start()
 
     private fun start() = work {
         val me = api.me()
@@ -369,14 +389,14 @@ class AppState(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun work(block: suspend () -> Unit) {
+    private fun work(signingIn: Boolean = false, block: suspend () -> Unit) {
         _ui.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
                 block()
                 _ui.update { it.copy(busy = false) }
             } catch (e: Throwable) {
-                fail(e)
+                fail(e, signingIn)
             }
         }
     }

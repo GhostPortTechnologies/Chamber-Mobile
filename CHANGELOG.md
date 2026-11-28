@@ -26,6 +26,12 @@
   Notifications shows the route, offers the choice on a phone with both, says which push servers the workspace
   allows when Chamber refuses one, and has "Send a test notification". UnifiedPush connector 3.3.6. Built and unit
   tested in CI, not yet tried on a phone.
+- Sign-in fixes from the first phone test (28 Nov): a wrong password or code now says so (it used to clear the screen
+  without a word); an expired code goes back to the password step; the code box shows unless Chamber says the account
+  has no authenticator code (as on the web page). Opening Chamber when loading the account fails now says why, with
+  "Try again" and "Sign out", instead of a spinner forever. Test builds add what failed to the message.
+- Crash report: if the app stops because of a bug, what failed is kept on the phone and shown the next time it
+  opens, with "Copy details". Nothing is sent by the app.
 - Tickets as a queue (T-0318): "Needs your decision" comes first, ordered so an agent waiting to start is first,
   then priority, then whatever has waited longest; each card shows how long it has waited and the first line of what
   it asks. "Your to-dos" (approved steps for a person) and "Agents' work" are kept apart. Approving still happens
